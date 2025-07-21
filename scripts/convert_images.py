@@ -6,15 +6,10 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import time
 
-class OptimizedCubemapConverter:
+class FlexibleCubemapConverter:
     def __init__(self, input_image_path, output_dir="cubemap_output", cube_size=None):
         """
-        Conversor de cubemap optimizado con OpenCV y NumPy
-        
-        Args:
-            input_image_path: Ruta de la imagen 360° equirectangular
-            output_dir: Directorio donde guardar las caras del cubo
-            cube_size: Tamaño de cada cara del cubo
+        Conversor de cubemap con ángulos personalizables
         """
         self.input_path = input_image_path
         self.output_dir = output_dir
@@ -28,14 +23,11 @@ class OptimizedCubemapConverter:
     def load_image(self):
         """Carga la imagen 360° usando OpenCV"""
         try:
-            # Cargar en RGB directamente
             self.image = cv2.imread(self.input_path)
             if self.image is None:
                 raise ValueError("No se pudo cargar la imagen")
             
-            # Convertir de BGR a RGB inmediatamente después de cargar
             self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
-            
             self.height, self.width = self.image.shape[:2]
             
             if self.cube_size is None:
@@ -49,112 +41,120 @@ class OptimizedCubemapConverter:
             return False
         return True
     
-    def create_face_mapping(self, face_index):
+    def create_custom_face_mapping(self, yaw, pitch, roll=0):
         """
-        Crea el mapeo de coordenadas para una cara usando operaciones vectorizadas
-        Mucho más rápido que el procesamiento pixel por pixel
+        Crea mapeo para una cara con orientación personalizada
+        
+        Args:
+            yaw: Rotación horizontal (0-360°) - 0° = Norte, 90° = Este
+            pitch: Elevación (-90° a +90°) - 0° = horizonte, +90° = directamente arriba
+            roll: Rotación de la cámara (generalmente 0°)
         """
-        # Crear grillas de coordenadas
+        # Convertir grados a radianes
+        yaw_rad = np.radians(yaw)
+        pitch_rad = np.radians(pitch)
+        roll_rad = np.radians(roll)
+        
+        # Crear grilla de coordenadas
         i, j = np.meshgrid(np.arange(self.cube_size), np.arange(self.cube_size))
         
-        # Normalizar coordenadas
+        # Normalizar coordenadas de la cara (-1 a +1)
         a = 2.0 * i / self.cube_size - 1.0
         b = 1.0 - 2.0 * j / self.cube_size
         
-        # Mapear según la cara
-        if face_index == 0:  # Frente (+Z)
-            x, y, z = a, b, np.ones_like(a)
-        elif face_index == 1:  # Derecha (+X)
-            x, y, z = np.ones_like(a), b, -a
-        elif face_index == 2:  # Atrás (-Z)
-            x, y, z = -a, b, -np.ones_like(a)
-        elif face_index == 3:  # Izquierda (-X)
-            x, y, z = -np.ones_like(a), b, a
-        elif face_index == 4:  # Arriba (+Y)
-            x, y, z = a, np.ones_like(a), -b
-        elif face_index == 5:  # Abajo (-Y)
-            x, y, z = a, -np.ones_like(a), b
+        # Coordenadas iniciales de la cara (mirando hacia +Z)
+        x = a
+        y = b
+        z = np.ones_like(a)
+        
+        # Aplicar rotaciones
+        # Rotación pitch (alrededor del eje X)
+        y_rot = y * np.cos(pitch_rad) - z * np.sin(pitch_rad)
+        z_rot = y * np.sin(pitch_rad) + z * np.cos(pitch_rad)
+        y = y_rot
+        z = z_rot
+        
+        # Rotación yaw (alrededor del eje Y)
+        x_rot = x * np.cos(yaw_rad) + z * np.sin(yaw_rad)
+        z_rot = -x * np.sin(yaw_rad) + z * np.cos(yaw_rad)
+        x = x_rot
+        z = z_rot
+        
+        # Rotación roll (alrededor del eje Z) - opcional
+        if roll != 0:
+            x_rot = x * np.cos(roll_rad) - y * np.sin(roll_rad)
+            y_rot = x * np.sin(roll_rad) + y * np.cos(roll_rad)
+            x = x_rot
+            y = y_rot
         
         # Convertir a coordenadas esféricas
         theta = np.arctan2(y, np.sqrt(x*x + z*z))
         phi = np.arctan2(x, z)
         
-        # Mapear a coordenadas de imagen
+        # Mapear a coordenadas de imagen equirectangular
         img_x = (phi / np.pi + 1.0) * 0.5 * self.width
         img_y = (0.5 - theta / np.pi) * self.height
         
-        # Asegurar que están dentro de los límites
+        # Asegurar límites
         img_x = np.clip(img_x, 0, self.width - 1)
         img_y = np.clip(img_y, 0, self.height - 1)
         
         return img_x.astype(np.float32), img_y.astype(np.float32)
     
-    def extract_face_vectorized(self, face_index):
-        """Extrae una cara usando operaciones vectorizadas de OpenCV"""
-        map_x, map_y = self.create_face_mapping(face_index)
-        
-        # Usar remap de OpenCV para sampling eficiente
+    def extract_custom_face(self, yaw, pitch, roll=0):
+        """Extrae una cara con orientación personalizada"""
+        map_x, map_y = self.create_custom_face_mapping(yaw, pitch, roll)
         face_image = cv2.remap(self.image, map_x, map_y, cv2.INTER_LINEAR)
-        
         return face_image
     
-    def extract_face_parallel(self, face_index):
-        """Wrapper para procesamiento paralelo"""
-        return face_index, self.extract_face_vectorized(face_index)
-    
-    def convert_to_cubemap_parallel(self):
-        """Convierte usando procesamiento paralelo"""
+    def convert_tree_optimized_views(self, elevation_angle=30):
+        """
+        Genera vistas optimizadas para capturar árboles
+        
+        Args:
+            elevation_angle: Ángulo de elevación en grados (recomendado: 15-45°)
+        """
         if not self.load_image():
             return False
         
-        face_names = ["front", "right", "back", "left", "up", "down"]
-        face_paths = []
-        
-        print("Iniciando conversión paralela a cubemap...")
+        print(f"Generando vistas optimizadas para árboles (elevación: {elevation_angle}°)...")
         start_time = time.time()
         
-        # Procesamiento paralelo de todas las caras
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            futures = [executor.submit(self.extract_face_parallel, i) for i in range(6)]
+        # Configuración de vistas para capturar árboles
+        views = [
+            # Vistas elevadas en 4 direcciones principales
+            {"name": "north_elevated", "yaw": 0, "pitch": elevation_angle},
+            {"name": "east_elevated", "yaw": 90, "pitch": elevation_angle},
+            {"name": "south_elevated", "yaw": 180, "pitch": elevation_angle},
+            {"name": "west_elevated", "yaw": 270, "pitch": elevation_angle},
             
-            for future in futures:
-                face_index, face_image = future.result()
-                
-                filename = f"{face_names[face_index]}.jpg"
-                filepath = os.path.join(self.output_dir, filename)
-                
-                # Guardar con cv2.imwrite (que espera BGR, así que convertimos RGB->BGR)
-                face_image_bgr = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
-                cv2.imwrite(filepath, face_image_bgr)
-                face_paths.append(filepath)
-                
-                print(f"Guardado: {filepath}")
+            # Vistas adicionales en diagonales
+            {"name": "northeast_elevated", "yaw": 45, "pitch": elevation_angle},
+            {"name": "southeast_elevated", "yaw": 135, "pitch": elevation_angle},
+            {"name": "southwest_elevated", "yaw": 225, "pitch": elevation_angle},
+            {"name": "northwest_elevated", "yaw": 315, "pitch": elevation_angle},
+            
+            # Vista directamente hacia arriba para referencia
+            {"name": "zenith", "yaw": 0, "pitch": 90},
+            
+            # Vistas horizontales tradicionales para comparación
+            {"name": "north_horizon", "yaw": 0, "pitch": 0},
+            {"name": "east_horizon", "yaw": 90, "pitch": 0},
+            {"name": "south_horizon", "yaw": 180, "pitch": 0},
+            {"name": "west_horizon", "yaw": 270, "pitch": 0},
+        ]
         
-        end_time = time.time()
-        print(f"¡Conversión completada en {end_time - start_time:.2f} segundos!")
-        return face_paths
-    
-    def convert_to_cubemap_sequential(self):
-        """Versión secuencial optimizada"""
-        if not self.load_image():
-            return False
-        
-        face_names = ["front", "right", "back", "left", "up", "down"]
         face_paths = []
         
-        print("Iniciando conversión secuencial optimizada...")
-        start_time = time.time()
-        
-        for face_index in range(6):
-            print(f"Procesando cara {face_index + 1}/6: {face_names[face_index]}")
+        for view in views:
+            print(f"Procesando vista: {view['name']} (yaw: {view['yaw']}°, pitch: {view['pitch']}°)")
             
-            face_image = self.extract_face_vectorized(face_index)
-            filename = f"{face_names[face_index]}.jpg"
+            face_image = self.extract_custom_face(view['yaw'], view['pitch'])
+            filename = f"{view['name']}.jpg"
             filepath = os.path.join(self.output_dir, filename)
             
-            # Guardar con cv2.imwrite (convertir RGB->BGR)
             face_image_bgr = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(filepath, face_image_bgr)
+            cv2.imwrite(filepath, face_image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
             face_paths.append(filepath)
             
             print(f"Guardado: {filepath}")
@@ -162,82 +162,123 @@ class OptimizedCubemapConverter:
         end_time = time.time()
         print(f"¡Conversión completada en {end_time - start_time:.2f} segundos!")
         return face_paths
-
-
-# Alternativa usando py360convert (biblioteca especializada)
-def convert_with_py360convert(input_path, output_dir, cube_size=None):
-    """
-    Alternativa usando la biblioteca py360convert
-    Requiere: pip install py360convert
-    """
-    try:
-        import py360convert
+    
+    def convert_custom_angles(self, angle_configs):
+        """
+        Convierte usando configuraciones de ángulos personalizadas
         
-        # Cargar imagen
-        equirectangular = cv2.imread(input_path)
-        if equirectangular is None:
-            print("Error al cargar la imagen")
+        Args:
+            angle_configs: Lista de diccionarios con 'name', 'yaw', 'pitch', 'roll' (opcional)
+        """
+        if not self.load_image():
             return False
         
-        h, w = equirectangular.shape[:2]
-        if cube_size is None:
-            cube_size = w // 4
-        
-        print(f"Convirtiendo con py360convert (tamaño: {cube_size}x{cube_size})...")
+        print("Generando vistas con ángulos personalizados...")
         start_time = time.time()
         
-        # Convertir a cubemap
-        cubemap = py360convert.e2c(equirectangular, face_w=cube_size, mode='bilinear')
-        
-        # Guardar caras
-        face_names = ["front", "right", "back", "left", "up", "down"]
         face_paths = []
         
-        os.makedirs(output_dir, exist_ok=True)
-        
-        for i, face_name in enumerate(face_names):
-            face_image = cubemap[:, :, i*3:(i+1)*3]  # Extraer cara
-            filename = f"{face_name}.jpg"
-            filepath = os.path.join(output_dir, filename)
+        for config in angle_configs:
+            name = config['name']
+            yaw = config['yaw']
+            pitch = config['pitch']
+            roll = config.get('roll', 0)
             
-            cv2.imwrite(filepath, face_image)
+            print(f"Procesando: {name} (yaw: {yaw}°, pitch: {pitch}°, roll: {roll}°)")
+            
+            face_image = self.extract_custom_face(yaw, pitch, roll)
+            filename = f"{name}.jpg"
+            filepath = os.path.join(self.output_dir, filename)
+            
+            face_image_bgr = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(filepath, face_image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
             face_paths.append(filepath)
+            
             print(f"Guardado: {filepath}")
         
         end_time = time.time()
-        print(f"¡Conversión con py360convert completada en {end_time - start_time:.2f} segundos!")
+        print(f"¡Conversión completada en {end_time - start_time:.2f} segundos!")
         return face_paths
+    
+    def convert_multi_elevation_survey(self, yaw_angles=None, pitch_angles=None):
+        """
+        Genera un survey completo con múltiples elevaciones
+        Ideal para análisis detallado de vegetación
+        """
+        if yaw_angles is None:
+            yaw_angles = [0, 45, 90, 135, 180, 225, 270, 315]  # Cada 45°
+        if pitch_angles is None:
+            pitch_angles = [0, 15, 30, 45, 60, 75, 90]  # Desde horizonte hasta cenital
         
-    except ImportError:
-        print("py360convert no está instalado. Instálalo con: pip install py360convert")
-        return False
+        if not self.load_image():
+            return False
+        
+        print(f"Generando survey completo ({len(yaw_angles)} direcciones × {len(pitch_angles)} elevaciones)...")
+        start_time = time.time()
+        
+        # Crear subdirectorio para el survey
+        survey_dir = os.path.join(self.output_dir, "multi_elevation_survey")
+        os.makedirs(survey_dir, exist_ok=True)
+        
+        face_paths = []
+        
+        for pitch in pitch_angles:
+            for yaw in yaw_angles:
+                name = f"survey_yaw{yaw:03d}_pitch{pitch:02d}"
+                print(f"Procesando: {name}")
+                
+                face_image = self.extract_custom_face(yaw, pitch)
+                filename = f"{name}.jpg"
+                filepath = os.path.join(survey_dir, filename)
+                
+                face_image_bgr = cv2.cvtColor(face_image, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(filepath, face_image_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
+                face_paths.append(filepath)
+        
+        end_time = time.time()
+        print(f"¡Survey completado en {end_time - start_time:.2f} segundos!")
+        print(f"Generadas {len(face_paths)} imágenes en: {survey_dir}")
+        return face_paths
 
 
 def main():
-    """Función principal"""
-    parser = argparse.ArgumentParser(description="Convertidor de cubemap optimizado")
+    """Función principal mejorada"""
+    parser = argparse.ArgumentParser(description="Convertidor de cubemap con ángulos personalizables")
     parser.add_argument("-i", "--image", required=True, help="Ruta a imagen equirectangular 360°")
     parser.add_argument("-o", "--output-dir", default="cubemap_output", help="Directorio de salida")
     parser.add_argument("-c", "--cube-size", type=int, default=None, help="Tamaño de cada cara del cubemap")
-    parser.add_argument("-m", "--method", choices=["opencv", "parallel", "py360convert"], 
-                       default="parallel", help="Método de conversión")
+    parser.add_argument("-m", "--method", choices=["trees", "custom", "survey"], 
+                       default="trees", help="Método de conversión")
+    parser.add_argument("-e", "--elevation", type=int, default=-45, 
+                       help="Ángulo de elevación para vista de árboles (grados)")
     
     args = parser.parse_args()
     
-    print(f"=== Convertidor de Cubemap Optimizado (método: {args.method}) ===\n")
+    print(f"=== Convertidor de Cubemap Flexible (método: {args.method}) ===\n")
     
-    if args.method == "py360convert":
-        face_paths = convert_with_py360convert(args.image, args.output_dir, args.cube_size)
-    else:
-        converter = OptimizedCubemapConverter(args.image, args.output_dir, args.cube_size)
-        
-        if args.method == "parallel":
-            face_paths = converter.convert_to_cubemap_parallel()
-        else:  # opencv
-            face_paths = converter.convert_to_cubemap_sequential()
+    converter = FlexibleCubemapConverter(args.image, args.output_dir, args.cube_size)
+    
+    if args.method == "trees":
+        # Optimizado para capturar árboles
+        face_paths = converter.convert_tree_optimized_views(args.elevation)
+    
+    elif args.method == "custom":
+        # Ejemplo de configuración personalizada
+        custom_angles = [
+            {"name": "trees_north", "yaw": 0, "pitch": 25},
+            {"name": "trees_south", "yaw": 180, "pitch": 25},
+            {"name": "canopy_overview", "yaw": 0, "pitch": 60},
+            {"name": "trunk_detail", "yaw": 90, "pitch": -10},
+        ]
+        face_paths = converter.convert_custom_angles(custom_angles)
+    
+    elif args.method == "survey":
+        # Survey completo multi-elevación
+        face_paths = converter.convert_multi_elevation_survey()
     
     if face_paths:
         print(f"\n¡Conversión exitosa! Archivos guardados en: {args.output_dir}")
+        print(f"Total de imágenes generadas: {len(face_paths)}")
     else:
         print("Error en la conversión")
 
