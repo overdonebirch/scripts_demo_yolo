@@ -19,35 +19,26 @@ class AnalizadorArboles:
         try:
             imagen = Image.open(imagen_path)
             
-            prompt = """
-            Como experto arboricultor, analiza esta imagen y evalúa:
+            prompt = """Como experto arboricultor, analiza esta imagen y responde las siguientes preguntas:
 
-            ESTADO DEL ÁRBOL:
-            - Vitalidad de hojas/follaje (buena/regular/mala)
-            - Condición de ramas principales
-            - Estado del tronco
+1. ¿El árbol está interfiriendo con la visibilidad de señales o semáforos? Indica si la obstrucción es parcial o total.
+2. ¿Se observan ramas o follaje tocando o muy próximas a fachadas, farolas u otros elementos construidos? Clasifica la severidad: leve, moderada o severa.
+3. ¿Presenta el árbol síntomas de mal estado (coloración anómala, baja densidad foliar, grietas, ramas rotas, inclinación peligrosa)? Enumera los síntomas detectados.
+4. ¿Hay ramas que proyecten sobre la calzada por debajo de 4,5 m o sobre la acera por debajo de 2,2 m? Señala ubicación y grado de severidad.
+5. ¿Se detectan bolsones sedosos característicos de la procesionaria? Indica número aproximado y proximidad a zonas sensibles (colegios, parques).
+6. ¿Aparecen estructuras de gran tamaño (> 40 cm) en la copa, como nidos de cotorras? Describe su diámetro aproximado y posición en el árbol.
 
-            RIESGOS IDENTIFICADOS:
-            - Ramas muertas o colgantes
-            - Inclinación excesiva
-            - Señales de enfermedad/plagas
-
-            OBSTRUCCIONES:
-            - Interferencia con cables eléctricos
-            - Proximidad a estructuras
-            - Bloqueo de señalización
-
-            Responde SOLO en formato JSON válido con esta estructura:
-            {
-                "hay_arbol": true/false,
-                "estado_general": "saludable/regular/malo/critico",
-                "riesgo_nivel": 1-10,
-                "problemas": ["lista de problemas detectados"],
-                "obstrucciones": ["lista de obstrucciones"],
-                "recomendaciones": ["acciones recomendadas"],
-                "descripcion": "descripción breve del estado"
-            }
-            """
+Responde SOLO en formato JSON válido con la siguiente estructura:
+{
+    "interferencia_senales": "...",
+    "ramas_follaje": "...",
+    "sintomas_mal_estado": "...",
+    "ramas_circulacion": "...",
+    "bolsones_procesionaria": "...",
+    "estructuras_copa": "...",
+    "descripcion": "descripción breve"
+}
+"""
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -203,12 +194,114 @@ class AnalizadorArboles:
             for estado, cantidad in estados.items():
                 print(f"  {estado}: {cantidad}")
 
+class AnalizadorAlcorques:
+    def __init__(self, api_key):
+        """Inicializar el analizador de alcorques con la API key de Gemini"""
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        
+    def analizar_alcorque(self, imagen_path):
+        """Analiza una imagen individual de alcorque usando Gemini"""
+        try:
+            imagen = Image.open(imagen_path)
+            
+            prompt = """Como experto en gestión de alcorques, analiza esta imagen y evalúa:
+
+1. ¿Se observan levantamientos, grietas o desplazamientos en el pavimento junto al alcorque? ¿Hay raíces superficiales conectando el daño con el árbol?
+2. ¿El alcorque está completamente vacío (sin árbol ni tocón)? Confirma asimismo la ausencia de plantones o tutores recientes.
+3. ¿Hay basura, escombros u otros objetos no autorizados dentro del alcorque? Describe su naturaleza y volumen aproximado.
+4. ¿Se aprecia un tocón en el alcorque? Indica su altura aproximada y posición relativa al borde.
+5. ¿La cobertura de malas hierbas supera el 50 % de la superficie o su altura excede los 15 cm? Indica densidad y especies dominantes.
+6. ¿Hay presencia de charcos o encharcamientos en el alcorque o acera adyacente? Estima su extensión y si el agua parece estancada o reciente.
+
+Responde SOLO en formato JSON válido con la siguiente estructura:
+{
+    "levantamientos": "...",
+    "alcorque_vacio": true/false,
+    "basura": "...",
+    "tocon": "...",
+    "malas_hierbas": "...",
+    "charcos": "...",
+    "descripcion": "descripción breve"
+}
+"""
+            
+            response = self.model.generate_content([prompt, imagen])
+            return response.text
+            
+        except Exception as e:
+            return json.dumps({
+                "error": str(e),
+                "descripcion": f"Error procesando imagen de alcorque: {str(e)}"
+            })
+
+    def procesar_imagen_individual_alcorque(self, imagen_path):
+        """Procesa una imagen individual de alcorque"""
+        print(f"🛠️ Analizando alcorque: {Path(imagen_path).name}")
+        
+        try:
+            analisis_texto = self.analizar_alcorque(imagen_path)
+            try:
+                analisis = json.loads(analisis_texto)
+            except json.JSONDecodeError:
+                analisis = {
+                    "analisis_texto": analisis_texto
+                }
+            return analisis
+        except Exception as e:
+            print(f"   ❌ Error analizando alcorque: {e}")
+            return {
+                "error": str(e)
+            }
+
+    def procesar_directorio_alcorque(self, directorio):
+        """Procesa todas las imágenes de un directorio de alcorques"""
+        extensiones = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
+        imagenes = []
+        for ext in extensiones:
+            imagenes.extend(glob.glob(os.path.join(directorio, ext)))
+            imagenes.extend(glob.glob(os.path.join(directorio, ext.upper())))
+        if not imagenes:
+            print(f"❌ No se encontraron imágenes de alcorques en {directorio}")
+            return []
+        print(f"📁 Procesando {len(imagenes)} imágenes de alcorques en el directorio: {directorio}")
+        resultados = []
+        for i, imagen_path in enumerate(imagenes, 1):
+            print(f"\n[{i}/{len(imagenes)}]", end=" ")
+            analisis = self.procesar_imagen_individual_alcorque(imagen_path)
+            resultados.append({'imagen': imagen_path, 'nombre': Path(imagen_path).name, 'analisis': analisis})
+        return resultados
+
+    def guardar_resultados_alcorque(self, resultados, output_file):
+        """Guarda los resultados de alcorques en un archivo JSON"""
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(resultados, f, indent=2, ensure_ascii=False)
+            print(f"\n💾 Resultados de alcorques guardados en: {output_file}")
+            return True
+        except Exception as e:
+            print(f"❌ Error guardando resultados de alcorques: {e}")
+            return False
+
+    def generar_resumen_alcorque(self, resultados):
+        """Genera resumen de resultados de alcorques"""
+        if not resultados:
+            return
+        total = len(resultados)
+        errores = sum(1 for r in resultados if 'error' in r.get('analisis', {}))
+        print(f"\n📊 RESUMEN ANÁLISIS ALCORQUES")
+        print(f"{'='*40}")
+        print(f"Total imágenes procesadas: {total}")
+        print(f"Errores: {errores}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description='Analizador de árboles con IA - Imágenes individuales')
+    parser = argparse.ArgumentParser(description='Analizador de imágenes de árboles y alcorques con IA')
     parser.add_argument('entrada', help='Ruta a imagen individual o directorio con imágenes')
     parser.add_argument('--api-key', required=True, help='API Key de Google Gemini')
     parser.add_argument('--output', '-o', help='Archivo para guardar resultados JSON')
     parser.add_argument('--resumen', action='store_true', help='Mostrar resumen al final')
+    parser.add_argument('--tipo', choices=['arboles','alcorques'], default='arboles', help='Tipo de agente: arboles o alcorques')
     
     args = parser.parse_args()
     
@@ -219,7 +312,10 @@ def main():
     
     # Inicializar analizador
     try:
-        analizador = AnalizadorArboles(args.api_key)
+        if args.tipo == 'alcorques':
+            analizador = AnalizadorAlcorques(args.api_key)
+        else:
+            analizador = AnalizadorArboles(args.api_key)
         print("✅ Analizador inicializado correctamente")
     except Exception as e:
         print(f"❌ Error inicializando analizador: {e}")
@@ -229,7 +325,10 @@ def main():
     if os.path.isfile(args.entrada):
         # Procesar imagen individual
         print(f"\n📸 Modo: Imagen individual")
-        analisis = analizador.procesar_imagen_individual(args.entrada)
+        if args.tipo == 'alcorques':
+            analisis = analizador.procesar_imagen_individual_alcorque(args.entrada)
+        else:
+            analisis = analizador.procesar_imagen_individual(args.entrada)
         
         resultados = [{
             'imagen': args.entrada,
@@ -240,18 +339,27 @@ def main():
     elif os.path.isdir(args.entrada):
         # Procesar directorio
         print(f"\n📁 Modo: Directorio completo")
-        resultados = analizador.procesar_directorio(args.entrada)
+        if args.tipo == 'alcorques':
+            resultados = analizador.procesar_directorio_alcorque(args.entrada)
+        else:
+            resultados = analizador.procesar_directorio(args.entrada)
     else:
         print(f"❌ Error: {args.entrada} no es un archivo ni directorio válido")
         sys.exit(1)
     
     # Guardar resultados si se especifica
     if args.output:
-        analizador.guardar_resultados(resultados, args.output)
+        if args.tipo == 'alcorques':
+            analizador.guardar_resultados_alcorque(resultados, args.output)
+        else:
+            analizador.guardar_resultados(resultados, args.output)
     
     # Mostrar resumen si se solicita
     if args.resumen:
-        analizador.generar_resumen(resultados)
+        if args.tipo == 'alcorques':
+            analizador.generar_resumen_alcorque(resultados)
+        else:
+            analizador.generar_resumen(resultados)
     
     print(f"\n🎯 Análisis completado")
 
