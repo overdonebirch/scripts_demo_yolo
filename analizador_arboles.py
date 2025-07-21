@@ -7,6 +7,7 @@ import sys
 import argparse
 import glob
 from pathlib import Path
+from datetime import datetime
 
 class AnalizadorArboles:
     def __init__(self, api_key):
@@ -145,6 +146,10 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
     def guardar_resultados(self, resultados, output_file):
         """Guarda los resultados en un archivo JSON"""
         try:
+            # Crear directorio de salida si no existe
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(resultados, f, indent=2, ensure_ascii=False)
             print(f"\n💾 Resultados guardados en: {output_file}")
@@ -275,6 +280,10 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
     def guardar_resultados_alcorque(self, resultados, output_file):
         """Guarda los resultados de alcorques en un archivo JSON"""
         try:
+            # Crear directorio de salida si no existe
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(resultados, f, indent=2, ensure_ascii=False)
             print(f"\n💾 Resultados de alcorques guardados en: {output_file}")
@@ -295,13 +304,128 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
         print(f"Errores: {errores}")
 
 
+def inferir_tipo_desde_nombre(nombre_archivo):
+    """Infiere el tipo de análisis desde el nombre del archivo"""
+    nombre_lower = nombre_archivo.lower()
+    if "_tree_" in nombre_lower or nombre_lower.endswith("_tree") or "_tree." in nombre_lower:
+        return 'arboles'
+    elif "_planter_" in nombre_lower or "_alcorque_" in nombre_lower or "_planter." in nombre_lower:
+        return 'alcorques'
+    else:
+        return None
+
+def procesar_directorio_mixto(directorio, analizador_arboles, analizador_alcorques):
+    """Procesa un directorio con imágenes mixtas (árboles y alcorques)"""
+    extensiones = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
+    imagenes = []
+    
+    for ext in extensiones:
+        imagenes.extend(glob.glob(os.path.join(directorio, ext)))
+        imagenes.extend(glob.glob(os.path.join(directorio, ext.upper())))
+    
+    if not imagenes:
+        print(f"❌ No se encontraron imágenes en {directorio}")
+        return {'arboles': [], 'alcorques': []}
+    
+    print(f"📁 Procesando {len(imagenes)} imágenes del directorio: {directorio}")
+    
+    resultados_arboles = []
+    resultados_alcorques = []
+    sin_clasificar = []
+    
+    for i, imagen_path in enumerate(imagenes, 1):
+        nombre_archivo = Path(imagen_path).name
+        tipo = inferir_tipo_desde_nombre(nombre_archivo)
+        
+        print(f"\n[{i}/{len(imagenes)}] {nombre_archivo}", end=" ")
+        
+        if tipo == 'arboles':
+            print("(🌳)", end=" ")
+            try:
+                analisis = analizador_arboles.procesar_imagen_individual(imagen_path)
+                resultado = {
+                    'imagen': imagen_path,
+                    'nombre': nombre_archivo,
+                    'analisis': analisis
+                }
+                resultados_arboles.append(resultado)
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                resultados_arboles.append({
+                    'imagen': imagen_path,
+                    'nombre': nombre_archivo,
+                    'error': str(e)
+                })
+                
+        elif tipo == 'alcorques':
+            print("(🛠️)", end=" ")
+            try:
+                analisis = analizador_alcorques.procesar_imagen_individual_alcorque(imagen_path)
+                resultado = {
+                    'imagen': imagen_path,
+                    'nombre': nombre_archivo,
+                    'analisis': analisis
+                }
+                resultados_alcorques.append(resultado)
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                resultados_alcorques.append({
+                    'imagen': imagen_path,
+                    'nombre': nombre_archivo,
+                    'error': str(e)
+                })
+        else:
+            print("(❓ No clasificado)")
+            sin_clasificar.append(nombre_archivo)
+    
+    if sin_clasificar:
+        print(f"\n⚠️  Archivos no clasificados (no contienen 'tree' ni 'planter'): {len(sin_clasificar)}")
+        for archivo in sin_clasificar[:5]:  # Mostrar solo los primeros 5
+            print(f"   - {archivo}")
+        if len(sin_clasificar) > 5:
+            print(f"   ... y {len(sin_clasificar) - 5} más")
+    
+    return {
+        'arboles': resultados_arboles,
+        'alcorques': resultados_alcorques,
+        'sin_clasificar': sin_clasificar
+    }
+
+def crear_ruta_output(entrada, tipo=None):
+    """Crea la ruta de output en la carpeta resultados/"""
+    # Obtener directorio raíz del script
+    script_dir = Path(__file__).parent
+    resultados_dir = script_dir / "resultados"
+    
+    # Crear directorio resultados si no existe
+    resultados_dir.mkdir(exist_ok=True)
+    
+    if os.path.isfile(entrada):
+        # Para imagen individual: resultados/nombre_imagen_tipo.json
+        nombre_base = Path(entrada).stem
+        if tipo:
+            output_file = resultados_dir / f"{nombre_base}_{tipo}.json"
+        else:
+            output_file = resultados_dir / f"{nombre_base}.json"
+    else:
+        # Para directorio: resultados/nombre_directorio_mixto_timestamp.json
+        nombre_directorio = Path(entrada).name
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        if tipo:
+            output_file = resultados_dir / f"{nombre_directorio}_{tipo}_{timestamp}.json"
+        else:
+            output_file = resultados_dir / f"{nombre_directorio}_mixto_{timestamp}.json"
+    
+    return str(output_file)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Analizador de imágenes de árboles y alcorques con IA')
     parser.add_argument('entrada', help='Ruta a imagen individual o directorio con imágenes')
     parser.add_argument('--api-key', required=True, help='API Key de Google Gemini')
-    parser.add_argument('--output', '-o', help='Archivo para guardar resultados JSON')
+    parser.add_argument('--output', '-o', help='Archivo para guardar resultados JSON (por defecto en carpeta resultados/)')
     parser.add_argument('--resumen', action='store_true', help='Mostrar resumen al final')
-    parser.add_argument('--tipo', choices=['arboles','alcorques'], default='arboles', help='Tipo de agente: arboles o alcorques')
+    parser.add_argument('--tipo', choices=['arboles','alcorques'], help='Forzar tipo de agente (por defecto se infiere del nombre de archivo)')
     
     args = parser.parse_args()
     
@@ -310,56 +434,123 @@ def main():
         print(f"❌ Error: No se encontró {args.entrada}")
         sys.exit(1)
     
-    # Inicializar analizador
-    try:
-        if args.tipo == 'alcorques':
-            analizador = AnalizadorAlcorques(args.api_key)
-        else:
-            analizador = AnalizadorArboles(args.api_key)
-        print("✅ Analizador inicializado correctamente")
-    except Exception as e:
-        print(f"❌ Error inicializando analizador: {e}")
-        sys.exit(1)
+    # Modo directorio o archivo individual
+    es_directorio = os.path.isdir(args.entrada)
     
-    # Determinar si es archivo o directorio
-    if os.path.isfile(args.entrada):
-        # Procesar imagen individual
-        print(f"\n📸 Modo: Imagen individual")
-        if args.tipo == 'alcorques':
-            analisis = analizador.procesar_imagen_individual_alcorque(args.entrada)
-        else:
-            analisis = analizador.procesar_imagen_individual(args.entrada)
+    if es_directorio and not args.tipo:
+        # Modo directorio mixto - procesar cada imagen según su nombre
+        print("📁 Modo: Directorio mixto (detectando tipo por nombre de archivo)")
         
-        resultados = [{
-            'imagen': args.entrada,
-            'nombre': Path(args.entrada).name,
-            'analisis': analisis
-        }]
+        # Inicializar ambos analizadores
+        try:
+            analizador_arboles = AnalizadorArboles(args.api_key)
+            analizador_alcorques = AnalizadorAlcorques(args.api_key)
+            print("✅ Analizadores inicializados correctamente")
+        except Exception as e:
+            print(f"❌ Error inicializando analizadores: {e}")
+            sys.exit(1)
         
-    elif os.path.isdir(args.entrada):
-        # Procesar directorio
-        print(f"\n📁 Modo: Directorio completo")
-        if args.tipo == 'alcorques':
-            resultados = analizador.procesar_directorio_alcorque(args.entrada)
-        else:
-            resultados = analizador.procesar_directorio(args.entrada)
+        # Procesar directorio mixto
+        resultados_mixtos = procesar_directorio_mixto(args.entrada, analizador_arboles, analizador_alcorques)
+        
+        # Crear salida si no se especificó
+        if not args.output:
+            args.output = crear_ruta_output(args.entrada)
+            print(f"📁 Resultados se guardarán en: {args.output}")
+        
+        # Guardar resultados mixtos
+        try:
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(args.output, 'w', encoding='utf-8') as f:
+                json.dump(resultados_mixtos, f, indent=2, ensure_ascii=False)
+            print(f"\n💾 Resultados guardados en: {args.output}")
+        except Exception as e:
+            print(f"❌ Error guardando resultados: {e}")
+        
+        # Mostrar resumen si se solicita
+        if args.resumen:
+            print(f"\n📊 RESUMEN DEL ANÁLISIS MIXTO")
+            print(f"{'='*40}")
+            print(f"Imágenes de árboles procesadas: {len(resultados_mixtos['arboles'])}")
+            print(f"Imágenes de alcorques procesadas: {len(resultados_mixtos['alcorques'])}")
+            print(f"Imágenes sin clasificar: {len(resultados_mixtos['sin_clasificar'])}")
+            
+            # Resumen detallado para árboles si hay
+            if resultados_mixtos['arboles']:
+                analizador_arboles.generar_resumen(resultados_mixtos['arboles'])
+            
+            # Resumen detallado para alcorques si hay
+            if resultados_mixtos['alcorques']:
+                analizador_alcorques.generar_resumen_alcorque(resultados_mixtos['alcorques'])
+        
     else:
-        print(f"❌ Error: {args.entrada} no es un archivo ni directorio válido")
-        sys.exit(1)
-    
-    # Guardar resultados si se especifica
-    if args.output:
+        # Modo tradicional - un solo tipo
+        if os.path.isfile(args.entrada):
+            # Derivar tipo para imagen individual si no se especificó
+            if not args.tipo:
+                args.tipo = inferir_tipo_desde_nombre(Path(args.entrada).name)
+                if not args.tipo:
+                    print("⚠️  No pude derivar el tipo de agente del nombre de la imagen.")
+                    print("    Usa --tipo arboles o --tipo alcorques para especificarlo.")
+                    sys.exit(1)
+                print(f"🔍 Tipo detectado: {args.tipo}")
+        
+        # Crear ruta de output si no se especificó
+        if not args.output:
+            args.output = crear_ruta_output(args.entrada, args.tipo)
+            print(f"📁 Resultados se guardarán en: {args.output}")
+
+        # Inicializar analizador específico
+        try:
+            if args.tipo == 'alcorques':
+                analizador = AnalizadorAlcorques(args.api_key)
+            else:
+                analizador = AnalizadorArboles(args.api_key)
+            print("✅ Analizador inicializado correctamente")
+        except Exception as e:
+            print(f"❌ Error inicializando analizador: {e}")
+            sys.exit(1)
+        
+        # Procesar según tipo
+        if os.path.isfile(args.entrada):
+            # Procesar imagen individual
+            print(f"\n📸 Modo: Imagen individual")
+            if args.tipo == 'alcorques':
+                analisis = analizador.procesar_imagen_individual_alcorque(args.entrada)
+            else:
+                analisis = analizador.procesar_imagen_individual(args.entrada)
+            
+            resultados = [{
+                'imagen': args.entrada,
+                'nombre': Path(args.entrada).name,
+                'analisis': analisis
+            }]
+            
+        elif os.path.isdir(args.entrada):
+            # Procesar directorio de un solo tipo
+            print(f"\n📁 Modo: Directorio de {args.tipo}")
+            if args.tipo == 'alcorques':
+                resultados = analizador.procesar_directorio_alcorque(args.entrada)
+            else:
+                resultados = analizador.procesar_directorio(args.entrada)
+        else:
+            print(f"❌ Error: {args.entrada} no es un archivo ni directorio válido")
+            sys.exit(1)
+        
+        # Guardar resultados
         if args.tipo == 'alcorques':
             analizador.guardar_resultados_alcorque(resultados, args.output)
         else:
             analizador.guardar_resultados(resultados, args.output)
-    
-    # Mostrar resumen si se solicita
-    if args.resumen:
-        if args.tipo == 'alcorques':
-            analizador.generar_resumen_alcorque(resultados)
-        else:
-            analizador.generar_resumen(resultados)
+        
+        # Mostrar resumen si se solicita
+        if args.resumen:
+            if args.tipo == 'alcorques':
+                analizador.generar_resumen_alcorque(resultados)
+            else:
+                analizador.generar_resumen(resultados)
     
     print(f"\n🎯 Análisis completado")
 
