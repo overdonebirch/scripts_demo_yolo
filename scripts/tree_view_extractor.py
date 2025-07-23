@@ -15,13 +15,14 @@ class TreeViewExtractor:
         self.width = 0
         self.height = 0
         
-        # # Coordenadas hardcodeadas de la cámara y el árbol
-        # self.camera_lat = 40.4281686
-        # self.camera_lon = -3.6933211
-        # self.camera_heading = 196.84  # Orientación inicial de la imagen
+   # Coordenadas hardcodeadas de la cámara y el árbol
+        self.camera_lat = 40.4281686
+        self.camera_lon = -3.6933211
+        self.camera_heading = 196.84  # Orientación inicial de la imagen
         
         self.tree_lat = 40.4281550
         self.tree_lon = -3.6932950
+        
         
         os.makedirs(output_dir, exist_ok=True)
         
@@ -150,47 +151,26 @@ class TreeViewExtractor:
         print(f"Bearing hacia el árbol: {tree_bearing:.2f}°")
         print(f"Diferencia con heading: {(tree_bearing - self.camera_heading):.2f}°")
         
-        # Configuraciones de vistas a extraer
+        # Obtener nombre base de la imagen original (sin extensión)
+        base_name = os.path.splitext(os.path.basename(self.input_path))[0]
+        
+        # Configuraciones de vistas a extraer - solo 2 vistas
         views = [
-            # Vista principal centrada en el árbol
-            {
-                "name": "tree_centered_fov90",
-                "bearing": tree_bearing,
-                "fov": 90,
-                "pitch": 0,
-                "size": (1024, 1024)
-            },
-            # Vista con FOV más estrecho para más detalle
-            {
-                "name": "tree_zoom_fov60",
-                "bearing": tree_bearing,
-                "fov": 60,
-                "pitch": 0,
-                "size": (1024, 1024)
-            },
-            # Vista mirando ligeramente hacia arriba (para capturar copa)
-            {
-                "name": "tree_elevated_pitch15",
-                "bearing": tree_bearing,
-                "fov": 90,
-                "pitch": 15,
-                "size": (1024, 1024)
-            },
             # Vista mirando hacia abajo (para capturar base/alcorque)
             {
-                "name": "tree_base_pitch-15",
+                "suffix": "_downward",
                 "bearing": tree_bearing,
                 "fov": 90,
-                "pitch": -15,
+                "pitch": -30,  # Mirando hacia abajo
                 "size": (1024, 1024)
             },
-            # Vista panorámica más amplia
+            # Vista mirando hacia arriba (para capturar copa)
             {
-                "name": "tree_wide_fov120",
+                "suffix": "_elevated",
                 "bearing": tree_bearing,
-                "fov": 120,
-                "pitch": 0,
-                "size": (1280, 720)
+                "fov": 90,
+                "pitch": 30,  # Mirando hacia arriba
+                "size": (1024, 1024)
             }
         ]
         
@@ -199,7 +179,8 @@ class TreeViewExtractor:
         print(f"\nExtrayendo {len(views)} vistas del árbol...")
         
         for view in views:
-            print(f"\nProcesando: {view['name']}")
+            view_type = "hacia abajo" if view['pitch'] < 0 else "hacia arriba"
+            print(f"\nProcesando vista {view_type}:")
             print(f"  - FOV: {view['fov']}°")
             print(f"  - Pitch: {view['pitch']}°")
             print(f"  - Tamaño: {view['size']}")
@@ -211,8 +192,8 @@ class TreeViewExtractor:
                 view['size']
             )
             
-            # Guardar imagen
-            filename = f"{view['name']}.jpg"
+            # Guardar imagen con nombre basado en el original
+            filename = f"{base_name}{view['suffix']}.jpg"
             filepath = os.path.join(self.output_dir, filename)
             
             extracted_view_bgr = cv2.cvtColor(extracted_view, cv2.COLOR_RGB2BGR)
