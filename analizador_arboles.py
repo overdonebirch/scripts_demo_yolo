@@ -26,8 +26,7 @@ class AnalizadorArboles:
 2. ¿Se observan ramas o follaje tocando o muy próximas a fachadas, farolas u otros elementos construidos? Clasifica la severidad: leve, moderada o severa.
 3. ¿Presenta el árbol síntomas de mal estado (coloración anómala, baja densidad foliar, grietas, ramas rotas, inclinación peligrosa)? Enumera los síntomas detectados.
 4. ¿Hay ramas que proyecten sobre la calzada por debajo de 4,5 m o sobre la acera por debajo de 2,2 m? Señala ubicación y grado de severidad.
-5. ¿Se detectan bolsones sedosos característicos de la procesionaria? Indica número aproximado y proximidad a zonas sensibles (colegios, parques).
-6. ¿Aparecen estructuras de gran tamaño (> 40 cm) en la copa, como nidos de cotorras? Describe su diámetro aproximado y posición en el árbol.
+5. ¿Aparecen estructuras de gran tamaño (> 40 cm) en la copa, como nidos de cotorras? Describe su diámetro aproximado y posición en el árbol.
 
 Responde SOLO en formato JSON válido con la siguiente estructura:
 {
@@ -35,7 +34,6 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
     "ramas_follaje": "...",
     "sintomas_mal_estado": "...",
     "ramas_circulacion": "...",
-    "bolsones_procesionaria": "...",
     "estructuras_copa": "...",
     "descripcion": "descripción breve"
 }
@@ -62,7 +60,15 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
             
             # Intentar parsear JSON
             try:
-                analisis = json.loads(analisis_texto)
+                # Limpiar markdown si está presente
+                texto_limpio = analisis_texto.strip()
+                if texto_limpio.startswith('```json'):
+                    texto_limpio = texto_limpio[7:]  # Remover ```json
+                if texto_limpio.endswith('```'):
+                    texto_limpio = texto_limpio[:-3]  # Remover ```
+                texto_limpio = texto_limpio.strip()
+                
+                analisis = json.loads(texto_limpio)
             except json.JSONDecodeError:
                 # Si no es JSON válido, crear estructura básica
                 analisis = {
@@ -247,7 +253,15 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
         try:
             analisis_texto = self.analizar_alcorque(imagen_path)
             try:
-                analisis = json.loads(analisis_texto)
+                # Limpiar markdown si está presente
+                texto_limpio = analisis_texto.strip()
+                if texto_limpio.startswith('```json'):
+                    texto_limpio = texto_limpio[7:]  # Remover ```json
+                if texto_limpio.endswith('```'):
+                    texto_limpio = texto_limpio[:-3]  # Remover ```
+                texto_limpio = texto_limpio.strip()
+                
+                analisis = json.loads(texto_limpio)
             except json.JSONDecodeError:
                 analisis = {
                     "analisis_texto": analisis_texto
@@ -304,94 +318,223 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
         print(f"Errores: {errores}")
 
 
-def inferir_tipo_desde_nombre(nombre_archivo):
-    """Infiere el tipo de análisis desde el nombre del archivo"""
-    nombre_lower = nombre_archivo.lower()
-    if "_tree_" in nombre_lower or nombre_lower.endswith("_tree") or "_tree." in nombre_lower:
-        return 'arboles'
-    elif "_planter_" in nombre_lower or "_alcorque_" in nombre_lower or "_planter." in nombre_lower:
-        return 'alcorques'
-    else:
-        return None
+class AnalizadorLimpieza:
+    def __init__(self, api_key):
+        """Inicializar el analizador de limpieza con la API key de Gemini"""
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        
+    def analizar_limpieza(self, imagen_path):
+        """Analiza una imagen específicamente para problemas de limpieza"""
+        try:
+            imagen = Image.open(imagen_path)
+            
+            prompt = """Como experto Inspector de Limpieza Viaria especializado en arbolado urbano, analiza esta imagen y evalúa:
 
-def procesar_directorio_mixto(directorio, analizador_arboles, analizador_alcorques):
-    """Procesa un directorio con imágenes mixtas (árboles y alcorques)"""
-    extensiones = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
-    imagenes = []
-    
-    for ext in extensiones:
-        imagenes.extend(glob.glob(os.path.join(directorio, ext)))
-        imagenes.extend(glob.glob(os.path.join(directorio, ext.upper())))
-    
-    if not imagenes:
-        print(f"❌ No se encontraron imágenes en {directorio}")
-        return {'arboles': [], 'alcorques': []}
-    
-    print(f"📁 Procesando {len(imagenes)} imágenes del directorio: {directorio}")
-    
-    resultados_arboles = []
-    resultados_alcorques = []
-    sin_clasificar = []
-    
-    for i, imagen_path in enumerate(imagenes, 1):
-        nombre_archivo = Path(imagen_path).name
-        tipo = inferir_tipo_desde_nombre(nombre_archivo)
+1. ¿Se observa basura, residuos o escombros en el alcorque del árbol? Describe el tipo y volumen aproximado (papel, plástico, orgánico, escombros, etc.).
+2. ¿Hay residuos acumulados en las ramas del árbol (bolsas de plástico, papel, otros objetos)? Indica ubicación y tipo.
+3. ¿Se detectan papeleras en la imagen? Si es así, ¿están desbordadas o con contenido visible fuera de ellas?
+4. ¿Hay acumulación de residuos en la acera o calzada adyacente al árbol? Clasifica el volumen: puntual, moderado o abundante.
+5. ¿Se observan excrementos de animales en el alcorque o zona inmediata? Indica cantidad aproximada.
+6. ¿El estado general de limpieza de la zona requiere intervención? Evalúa la severidad: leve, moderada o severa.
+
+Responde SOLO en formato JSON válido con la siguiente estructura:
+{
+    "basura_alcorque": "descripción detallada o 'no detectada'",
+    "residuos_ramas": "descripción y ubicación o 'no detectados'",
+    "papeleras_desbordadas": "sí/no con descripción o 'no visible'",
+    "acumulacion_acera": "descripción y volumen o 'no detectada'",
+    "excrementos": "descripción cantidad o 'no detectados'",
+    "estado_general": "limpio/sucio_leve/sucio_moderado/sucio_severo",
+    "requiere_intervencion": true/false,
+    "prioridad": "baja/media/alta",
+    "descripcion": "resumen general del estado de limpieza"
+}
+"""
+            
+            response = self.model.generate_content([prompt, imagen])
+            return response.text
+            
+        except Exception as e:
+            return json.dumps({
+                "error": str(e),
+                "estado_general": "error",
+                "requiere_intervencion": False,
+                "prioridad": "baja",
+                "descripcion": f"Error procesando imagen de limpieza: {str(e)}"
+            })
+
+    def procesar_imagen_individual_limpieza(self, imagen_path):
+        """Procesa una imagen individual para análisis de limpieza"""
+        print(f"🧹 Analizando limpieza: {Path(imagen_path).name}")
         
-        print(f"\n[{i}/{len(imagenes)}] {nombre_archivo}", end=" ")
-        
-        if tipo == 'arboles':
-            print("(🌳)", end=" ")
+        try:
+            analisis_texto = self.analizar_limpieza(imagen_path)
             try:
-                analisis = analizador_arboles.procesar_imagen_individual(imagen_path)
-                resultado = {
-                    'imagen': imagen_path,
-                    'nombre': nombre_archivo,
-                    'analisis': analisis
-                }
-                resultados_arboles.append(resultado)
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                resultados_arboles.append({
-                    'imagen': imagen_path,
-                    'nombre': nombre_archivo,
-                    'error': str(e)
-                })
+                # Limpiar markdown si está presente
+                texto_limpio = analisis_texto.strip()
+                if texto_limpio.startswith('```json'):
+                    texto_limpio = texto_limpio[7:]  # Remover ```json
+                if texto_limpio.endswith('```'):
+                    texto_limpio = texto_limpio[:-3]  # Remover ```
+                texto_limpio = texto_limpio.strip()
                 
-        elif tipo == 'alcorques':
-            print("(🛠️)", end=" ")
-            try:
-                analisis = analizador_alcorques.procesar_imagen_individual_alcorque(imagen_path)
-                resultado = {
-                    'imagen': imagen_path,
-                    'nombre': nombre_archivo,
-                    'analisis': analisis
+                analisis = json.loads(texto_limpio)
+            except json.JSONDecodeError:
+                analisis = {
+                    "estado_general": "indeterminado",
+                    "requiere_intervencion": False,
+                    "prioridad": "baja",
+                    "analisis_texto": analisis_texto
                 }
-                resultados_alcorques.append(resultado)
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                resultados_alcorques.append({
-                    'imagen': imagen_path,
-                    'nombre': nombre_archivo,
-                    'error': str(e)
-                })
-        else:
-            print("(❓ No clasificado)")
-            sin_clasificar.append(nombre_archivo)
-    
-    if sin_clasificar:
-        print(f"\n⚠️  Archivos no clasificados (no contienen 'tree' ni 'planter'): {len(sin_clasificar)}")
-        for archivo in sin_clasificar[:5]:  # Mostrar solo los primeros 5
-            print(f"   - {archivo}")
-        if len(sin_clasificar) > 5:
-            print(f"   ... y {len(sin_clasificar) - 5} más")
-    
-    return {
-        'arboles': resultados_arboles,
-        'alcorques': resultados_alcorques,
-        'sin_clasificar': sin_clasificar
-    }
+            
+            # Mostrar resumen en consola
+            estado = analisis.get('estado_general', 'indeterminado')
+            requiere = analisis.get('requiere_intervencion', False)
+            prioridad = analisis.get('prioridad', 'baja')
+            descripcion = analisis.get('descripcion', '')
+            
+            print(f"   🧹 Estado limpieza: {estado}")
+            print(f"   🚨 Requiere intervención: {'Sí' if requiere else 'No'}")
+            print(f"   📊 Prioridad: {prioridad}")
+            if descripcion:
+                print(f"   📝 {descripcion}")
+            
+            # Mostrar problemas específicos detectados
+            problemas = []
+            if analisis.get('basura_alcorque', 'no detectada') != 'no detectada':
+                problemas.append(f"Basura en alcorque: {analisis['basura_alcorque']}")
+            if analisis.get('residuos_ramas', 'no detectados') != 'no detectados':
+                problemas.append(f"Residuos en ramas: {analisis['residuos_ramas']}")
+            if analisis.get('papeleras_desbordadas', 'no visible') not in ['no visible', 'no']:
+                problemas.append(f"Papeleras: {analisis['papeleras_desbordadas']}")
+            if analisis.get('acumulacion_acera', 'no detectada') != 'no detectada':
+                problemas.append(f"Acera: {analisis['acumulacion_acera']}")
+            if analisis.get('excrementos', 'no detectados') != 'no detectados':
+                problemas.append(f"Excrementos: {analisis['excrementos']}")
+            
+            if problemas:
+                print(f"   🗑️ Problemas detectados:")
+                for problema in problemas[:3]:  # Mostrar máximo 3 para no saturar
+                    print(f"      - {problema}")
+                if len(problemas) > 3:
+                    print(f"      ... y {len(problemas) - 3} más")
+            
+            return analisis
+            
+        except Exception as e:
+            print(f"   ❌ Error analizando limpieza: {e}")
+            return {
+                "error": str(e),
+                "estado_general": "error",
+                "requiere_intervencion": False,
+                "prioridad": "baja"
+            }
 
-def crear_ruta_output(entrada, tipo=None):
+    def procesar_directorio_limpieza(self, directorio):
+        """Procesa todas las imágenes de un directorio para análisis de limpieza"""
+        extensiones = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
+        imagenes = []
+        for ext in extensiones:
+            imagenes.extend(glob.glob(os.path.join(directorio, ext)))
+            imagenes.extend(glob.glob(os.path.join(directorio, ext.upper())))
+        
+        if not imagenes:
+            print(f"❌ No se encontraron imágenes de limpieza en {directorio}")
+            return []
+        
+        print(f"📁 Procesando {len(imagenes)} imágenes para análisis de limpieza en: {directorio}")
+        
+        resultados = []
+        for i, imagen_path in enumerate(imagenes, 1):
+            print(f"\n[{i}/{len(imagenes)}]", end=" ")
+            analisis = self.procesar_imagen_individual_limpieza(imagen_path)
+            resultados.append({
+                'imagen': imagen_path, 
+                'nombre': Path(imagen_path).name, 
+                'analisis': analisis
+            })
+        
+        return resultados
+
+    def guardar_resultados_limpieza(self, resultados, output_file):
+        """Guarda los resultados de limpieza en un archivo JSON"""
+        try:
+            output_path = Path(output_file)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(resultados, f, indent=2, ensure_ascii=False)
+            print(f"\n💾 Resultados de limpieza guardados en: {output_file}")
+            return True
+        except Exception as e:
+            print(f"❌ Error guardando resultados de limpieza: {e}")
+            return False
+
+    def generar_resumen_limpieza(self, resultados):
+        """Genera resumen de resultados de limpieza"""
+        if not resultados:
+            return
+        
+        total = len(resultados)
+        errores = sum(1 for r in resultados if 'error' in r.get('analisis', {}))
+        requieren_intervencion = sum(1 for r in resultados 
+                                   if r.get('analisis', {}).get('requiere_intervencion', False))
+        
+        # Contar por estado general
+        estados = {}
+        prioridades = {}
+        problemas_frecuentes = {
+            'basura_alcorque': 0,
+            'residuos_ramas': 0,
+            'papeleras_desbordadas': 0,
+            'acumulacion_acera': 0,
+            'excrementos': 0
+        }
+        
+        for resultado in resultados:
+            analisis = resultado.get('analisis', {})
+            if isinstance(analisis, dict) and 'error' not in analisis:
+                estado = analisis.get('estado_general', 'desconocido')
+                estados[estado] = estados.get(estado, 0) + 1
+                
+                prioridad = analisis.get('prioridad', 'baja')
+                prioridades[prioridad] = prioridades.get(prioridad, 0) + 1
+                
+                # Contar problemas específicos
+                for problema in problemas_frecuentes.keys():
+                    valor = analisis.get(problema, '')
+                    if valor and valor not in ['no detectada', 'no detectados', 'no visible', 'no']:
+                        problemas_frecuentes[problema] += 1
+        
+        print(f"\n📊 RESUMEN ANÁLISIS DE LIMPIEZA")
+        print(f"{'='*40}")
+        print(f"Total imágenes procesadas: {total}")
+        print(f"Imágenes que requieren intervención: {requieren_intervencion}")
+        print(f"Imágenes limpias: {total - requieren_intervencion - errores}")
+        print(f"Errores: {errores}")
+        
+        if estados:
+            print(f"\nEstados de limpieza detectados:")
+            for estado, cantidad in sorted(estados.items()):
+                print(f"  {estado}: {cantidad}")
+        
+        if prioridades:
+            print(f"\nPrioridades asignadas:")
+            for prioridad, cantidad in sorted(prioridades.items()):
+                print(f"  {prioridad}: {cantidad}")
+        
+        if any(count > 0 for count in problemas_frecuentes.values()):
+            print(f"\nProblemas más frecuentes:")
+            problemas_ordenados = sorted(problemas_frecuentes.items(), 
+                                       key=lambda x: x[1], reverse=True)
+            for problema, cantidad in problemas_ordenados:
+                if cantidad > 0:
+                    nombre_problema = problema.replace('_', ' ').title()
+                    print(f"  {nombre_problema}: {cantidad} casos")
+
+
+def crear_ruta_output(entrada, tipo):
     """Crea la ruta de output en la carpeta resultados/"""
     # Obtener directorio raíz del script
     script_dir = Path(__file__).parent
@@ -403,29 +546,23 @@ def crear_ruta_output(entrada, tipo=None):
     if os.path.isfile(entrada):
         # Para imagen individual: resultados/nombre_imagen_tipo.json
         nombre_base = Path(entrada).stem
-        if tipo:
-            output_file = resultados_dir / f"{nombre_base}_{tipo}.json"
-        else:
-            output_file = resultados_dir / f"{nombre_base}.json"
+        output_file = resultados_dir / f"{nombre_base}_{tipo}.json"
     else:
-        # Para directorio: resultados/nombre_directorio_mixto_timestamp.json
+        # Para directorio: resultados/nombre_directorio_tipo_timestamp.json
         nombre_directorio = Path(entrada).name
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        if tipo:
-            output_file = resultados_dir / f"{nombre_directorio}_{tipo}_{timestamp}.json"
-        else:
-            output_file = resultados_dir / f"{nombre_directorio}_mixto_{timestamp}.json"
+        output_file = resultados_dir / f"{nombre_directorio}_{tipo}_{timestamp}.json"
     
     return str(output_file)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Analizador de imágenes de árboles y alcorques con IA')
+    parser = argparse.ArgumentParser(description='Analizador de imágenes de árboles, alcorques y limpieza con IA')
     parser.add_argument('entrada', help='Ruta a imagen individual o directorio con imágenes')
     parser.add_argument('--api-key', required=True, help='API Key de Google Gemini')
     parser.add_argument('--output', '-o', help='Archivo para guardar resultados JSON (por defecto en carpeta resultados/)')
     parser.add_argument('--resumen', action='store_true', help='Mostrar resumen al final')
-    parser.add_argument('--tipo', choices=['arboles','alcorques'], help='Forzar tipo de agente (por defecto se infiere del nombre de archivo)')
+    parser.add_argument('--tipo', choices=['arboles','alcorques','limpieza'], required=True, help='Tipo de análisis a realizar')
     
     args = parser.parse_args()
     
@@ -434,123 +571,70 @@ def main():
         print(f"❌ Error: No se encontró {args.entrada}")
         sys.exit(1)
     
-    # Modo directorio o archivo individual
-    es_directorio = os.path.isdir(args.entrada)
-    
-    if es_directorio and not args.tipo:
-        # Modo directorio mixto - procesar cada imagen según su nombre
-        print("📁 Modo: Directorio mixto (detectando tipo por nombre de archivo)")
-        
-        # Inicializar ambos analizadores
-        try:
-            analizador_arboles = AnalizadorArboles(args.api_key)
-            analizador_alcorques = AnalizadorAlcorques(args.api_key)
-            print("✅ Analizadores inicializados correctamente")
-        except Exception as e:
-            print(f"❌ Error inicializando analizadores: {e}")
-            sys.exit(1)
-        
-        # Procesar directorio mixto
-        resultados_mixtos = procesar_directorio_mixto(args.entrada, analizador_arboles, analizador_alcorques)
-        
-        # Crear salida si no se especificó
-        if not args.output:
-            args.output = crear_ruta_output(args.entrada)
-            print(f"📁 Resultados se guardarán en: {args.output}")
-        
-        # Guardar resultados mixtos
-        try:
-            output_path = Path(args.output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(args.output, 'w', encoding='utf-8') as f:
-                json.dump(resultados_mixtos, f, indent=2, ensure_ascii=False)
-            print(f"\n💾 Resultados guardados en: {args.output}")
-        except Exception as e:
-            print(f"❌ Error guardando resultados: {e}")
-        
-        # Mostrar resumen si se solicita
-        if args.resumen:
-            print(f"\n📊 RESUMEN DEL ANÁLISIS MIXTO")
-            print(f"{'='*40}")
-            print(f"Imágenes de árboles procesadas: {len(resultados_mixtos['arboles'])}")
-            print(f"Imágenes de alcorques procesadas: {len(resultados_mixtos['alcorques'])}")
-            print(f"Imágenes sin clasificar: {len(resultados_mixtos['sin_clasificar'])}")
-            
-            # Resumen detallado para árboles si hay
-            if resultados_mixtos['arboles']:
-                analizador_arboles.generar_resumen(resultados_mixtos['arboles'])
-            
-            # Resumen detallado para alcorques si hay
-            if resultados_mixtos['alcorques']:
-                analizador_alcorques.generar_resumen_alcorque(resultados_mixtos['alcorques'])
-        
-    else:
-        # Modo tradicional - un solo tipo
-        if os.path.isfile(args.entrada):
-            # Derivar tipo para imagen individual si no se especificó
-            if not args.tipo:
-                args.tipo = inferir_tipo_desde_nombre(Path(args.entrada).name)
-                if not args.tipo:
-                    print("⚠️  No pude derivar el tipo de agente del nombre de la imagen.")
-                    print("    Usa --tipo arboles o --tipo alcorques para especificarlo.")
-                    sys.exit(1)
-                print(f"🔍 Tipo detectado: {args.tipo}")
-        
-        # Crear ruta de output si no se especificó
-        if not args.output:
-            args.output = crear_ruta_output(args.entrada, args.tipo)
-            print(f"📁 Resultados se guardarán en: {args.output}")
+    # Crear ruta de output si no se especificó
+    if not args.output:
+        args.output = crear_ruta_output(args.entrada, args.tipo)
+        print(f"📁 Resultados se guardarán en: {args.output}")
 
-        # Inicializar analizador específico
-        try:
-            if args.tipo == 'alcorques':
-                analizador = AnalizadorAlcorques(args.api_key)
-            else:
-                analizador = AnalizadorArboles(args.api_key)
-            print("✅ Analizador inicializado correctamente")
-        except Exception as e:
-            print(f"❌ Error inicializando analizador: {e}")
-            sys.exit(1)
-        
-        # Procesar según tipo
-        if os.path.isfile(args.entrada):
-            # Procesar imagen individual
-            print(f"\n📸 Modo: Imagen individual")
-            if args.tipo == 'alcorques':
-                analisis = analizador.procesar_imagen_individual_alcorque(args.entrada)
-            else:
-                analisis = analizador.procesar_imagen_individual(args.entrada)
-            
-            resultados = [{
-                'imagen': args.entrada,
-                'nombre': Path(args.entrada).name,
-                'analisis': analisis
-            }]
-            
-        elif os.path.isdir(args.entrada):
-            # Procesar directorio de un solo tipo
-            print(f"\n📁 Modo: Directorio de {args.tipo}")
-            if args.tipo == 'alcorques':
-                resultados = analizador.procesar_directorio_alcorque(args.entrada)
-            else:
-                resultados = analizador.procesar_directorio(args.entrada)
-        else:
-            print(f"❌ Error: {args.entrada} no es un archivo ni directorio válido")
-            sys.exit(1)
-        
-        # Guardar resultados
+    # Inicializar analizador específico
+    try:
         if args.tipo == 'alcorques':
-            analizador.guardar_resultados_alcorque(resultados, args.output)
+            analizador = AnalizadorAlcorques(args.api_key)
+        elif args.tipo == 'limpieza':
+            analizador = AnalizadorLimpieza(args.api_key)
         else:
-            analizador.guardar_resultados(resultados, args.output)
+            analizador = AnalizadorArboles(args.api_key)
+        print("✅ Analizador inicializado correctamente")
+    except Exception as e:
+        print(f"❌ Error inicializando analizador: {e}")
+        sys.exit(1)
+    
+    # Procesar según tipo
+    if os.path.isfile(args.entrada):
+        # Procesar imagen individual
+        print(f"\n📸 Modo: Imagen individual - {args.tipo}")
+        if args.tipo == 'alcorques':
+            analisis = analizador.procesar_imagen_individual_alcorque(args.entrada)
+        elif args.tipo == 'limpieza':
+            analisis = analizador.procesar_imagen_individual_limpieza(args.entrada)
+        else:
+            analisis = analizador.procesar_imagen_individual(args.entrada)
         
-        # Mostrar resumen si se solicita
-        if args.resumen:
-            if args.tipo == 'alcorques':
-                analizador.generar_resumen_alcorque(resultados)
-            else:
-                analizador.generar_resumen(resultados)
+        resultados = [{
+            'imagen': args.entrada,
+            'nombre': Path(args.entrada).name,
+            'analisis': analisis
+        }]
+        
+    elif os.path.isdir(args.entrada):
+        # Procesar directorio de un solo tipo
+        print(f"\n📁 Modo: Directorio de {args.tipo}")
+        if args.tipo == 'alcorques':
+            resultados = analizador.procesar_directorio_alcorque(args.entrada)
+        elif args.tipo == 'limpieza':
+            resultados = analizador.procesar_directorio_limpieza(args.entrada)
+        else:
+            resultados = analizador.procesar_directorio(args.entrada)
+    else:
+        print(f"❌ Error: {args.entrada} no es un archivo ni directorio válido")
+        sys.exit(1)
+    
+    # Guardar resultados
+    if args.tipo == 'alcorques':
+        analizador.guardar_resultados_alcorque(resultados, args.output)
+    elif args.tipo == 'limpieza':
+        analizador.guardar_resultados_limpieza(resultados, args.output)
+    else:
+        analizador.guardar_resultados(resultados, args.output)
+    
+    # Mostrar resumen si se solicita
+    if args.resumen:
+        if args.tipo == 'alcorques':
+            analizador.generar_resumen_alcorque(resultados)
+        elif args.tipo == 'limpieza':
+            analizador.generar_resumen_limpieza(resultados)
+        else:
+            analizador.generar_resumen(resultados)
     
     print(f"\n🎯 Análisis completado")
 
