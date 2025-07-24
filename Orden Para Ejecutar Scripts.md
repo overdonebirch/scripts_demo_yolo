@@ -11,12 +11,12 @@ python .\scripts_yolo\analyze_faces.py -f .\nombre_carpeta_output_con_caras\ -m 
 
 python .scripts_yolo\bbox_to_360.py -i .\imagenes\c_fernando_el_santo.jpg -d .nombre_carpeta_output_con_caras\detections.json --radius 30 -o nombre_resultado.jpg
 
-## 4 Extraer crops : 
+## 4 Extraer imagenes de arboles completos : 
 
-python .\scripts\extract_crops.py -f .\nombre_carpeta_output_con_caras\ -d .\nombre_carpeta_output_con_caras\detections.json -o crops/
+python .\scripts\extract_full_trees.py -e imagen_360_original.jpg -d .\nombre_carpeta_output_con_caras\detections.json -o nombre_carpeta_output
 
-## 5 Analizar Crops : 
+## 5 Analizar imagenes : 
 
-python analizador_arboles.py crops/ --api-key TU_API_KEY --resumen
+python analizador_arboles.py carpeta_output/ --api-key TU_API_KEY --resumen
 
 (Los resultados se guardan en la carpeta resultados en la raiz)
