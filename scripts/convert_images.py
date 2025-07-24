@@ -123,25 +123,10 @@ class FlexibleCubemapConverter:
         # Configuración de vistas para capturar árboles
         views = [
             # Vistas elevadas en 4 direcciones principales
-            {"name": "north_elevated", "yaw": 0, "pitch": elevation_angle},
-            {"name": "east_elevated", "yaw": 90, "pitch": elevation_angle},
-            {"name": "south_elevated", "yaw": 180, "pitch": elevation_angle},
-            {"name": "west_elevated", "yaw": 270, "pitch": elevation_angle},
-            
-            # Vistas adicionales en diagonales
-            {"name": "northeast_elevated", "yaw": 45, "pitch": elevation_angle},
-            {"name": "southeast_elevated", "yaw": 135, "pitch": elevation_angle},
-            {"name": "southwest_elevated", "yaw": 225, "pitch": elevation_angle},
-            {"name": "northwest_elevated", "yaw": 315, "pitch": elevation_angle},
-            
-            # Vista directamente hacia arriba para referencia
-            {"name": "zenith", "yaw": 0, "pitch": 90},
-            
-            # Vistas horizontales tradicionales para comparación
-            {"name": "north_horizon", "yaw": 0, "pitch": 0},
-            {"name": "east_horizon", "yaw": 90, "pitch": 0},
-            {"name": "south_horizon", "yaw": 180, "pitch": 0},
-            {"name": "west_horizon", "yaw": 270, "pitch": 0},
+            {"name": "front", "yaw": 0, "pitch": 0},
+            {"name": "right", "yaw": 90, "pitch": 0},
+            {"name": "back", "yaw": 180, "pitch": 0},
+            {"name": "left", "yaw": 270, "pitch": 0},
         ]
         
         face_paths = []
