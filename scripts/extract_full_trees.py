@@ -133,7 +133,8 @@ class TreeExtractor:
         return x, y
     
     def estimate_tree_bounds(self, center_yaw: float, center_pitch: float, 
-                           initial_width: float, initial_height: float) -> Dict:
+                           initial_width: float, initial_height: float,
+                           class_id: int = 3) -> Dict:
         """
         Estima los límites completos del árbol en la imagen equirectangular
         
@@ -142,25 +143,34 @@ class TreeExtractor:
             center_pitch: Pitch del centro de la detección
             initial_width: Ancho inicial del bbox en grados
             initial_height: Alto inicial del bbox en grados
+            class_id: ID de la clase del objeto detectado
             
         Returns:
             Diccionario con los límites del árbol
         """
-        # Para árboles, típicamente necesitamos expandir hacia abajo (tronco)
-        # y mantener o expandir ligeramente los lados
-        
-        # Factores de expansión basados en la posición vertical
-        if center_pitch > 30:  # Mirando hacia arriba
-            expand_bottom = 3.0  # Expandir mucho hacia abajo para capturar el tronco
-            expand_top = 1.2
-        elif center_pitch < -30:  # Mirando hacia abajo
-            expand_bottom = 1.2
-            expand_top = 3.0  # Expandir hacia arriba para capturar la copa
-        else:  # Vista horizontal
-            expand_bottom = 2.0  # Expandir moderadamente en ambas direcciones
-            expand_top = 1.5
-        
-        expand_sides = 1.3  # Expansión lateral para capturar ramas
+        # Lógica diferente según la clase
+        if class_id == 0:  # Alcorque (elemento en el suelo)
+            # Para alcorques, expansión mínima ya que están bien definidos en el suelo
+            expand_bottom = 1.1
+            expand_top = 1.1
+            expand_sides = 1.2
+        elif class_id == 2:  # Otra clase (ajustar según necesidad)
+            expand_bottom = 1.3
+            expand_top = 1.3
+            expand_sides = 1.3
+        else:  # Clase 3 (árboles) y otras
+            # Para árboles, lógica original basada en la posición vertical
+            if center_pitch > 30:  # Mirando hacia arriba
+                expand_bottom = 3.0  # Expandir mucho hacia abajo para capturar el tronco
+                expand_top = 1.2
+            elif center_pitch < -30:  # Mirando hacia abajo
+                expand_bottom = 1.2
+                expand_top = 3.0  # Expandir hacia arriba para capturar la copa
+            else:  # Vista horizontal
+                expand_bottom = 2.0  # Expandir moderadamente en ambas direcciones
+                expand_top = 1.5
+            
+            expand_sides = 1.3  # Expansión lateral para capturar ramas
         
         # Calcular nuevos límites
         tree_bounds = {
@@ -237,7 +247,7 @@ class TreeExtractor:
     
     def process_detections(self, output_dir: str = "extracted_trees", 
                           confidence_threshold: float = 0.3,
-                          target_classes: List[int] = [3]):  # Asumiendo que clase 3 es árbol
+                          target_classes: List[int] = [0, 3]):  # Incluir alcorques (0) y árboles (3)
         """
         Procesa todas las detecciones y extrae árboles completos
         
@@ -247,6 +257,10 @@ class TreeExtractor:
             target_classes: Lista de IDs de clases a extraer (árboles)
         """
         os.makedirs(output_dir, exist_ok=True)
+        
+        # Crear subdirectorio para visualizaciones
+        viz_dir = os.path.join(output_dir, "viz")
+        os.makedirs(viz_dir, exist_ok=True)
         
         tree_count = 0
         extracted_trees = []
@@ -290,7 +304,8 @@ class TreeExtractor:
                 
                 # Estimar límites completos del árbol
                 tree_bounds = self.estimate_tree_bounds(center_yaw, center_pitch, 
-                                                      bbox_width_deg, bbox_height_deg)
+                                                      bbox_width_deg, bbox_height_deg,
+                                                      detection['class'])
                 
                 # Extraer árbol de la imagen equirectangular
                 tree_crop = self.extract_tree_from_equirect(tree_bounds)
@@ -301,7 +316,9 @@ class TreeExtractor:
                     continue
                 
                 # Guardar imagen
-                filename = f"tree_{tree_count:03d}_{face_name}_conf{detection['score']:.2f}.jpg"
+                class_names = {0: "alcorque", 2: "class2", 3: "tree"}
+                class_name = class_names.get(detection['class'], f"class{detection['class']}")
+                filename = f"{class_name}_{tree_count:03d}_{face_name}_conf{detection['score']:.2f}.jpg"
                 filepath = os.path.join(output_dir, filename)
                 cv2.imwrite(filepath, tree_crop, [cv2.IMWRITE_JPEG_QUALITY, 95])
                 
@@ -325,8 +342,9 @@ class TreeExtractor:
                 
                 # Opcionalmente, crear una visualización con el bbox original y expandido
                 if tree_count <= 5:  # Solo para los primeros árboles
-                    self.create_visualization(face_name, detection, tree_bounds, 
-                                            os.path.join(output_dir, f"viz_{tree_count:03d}.jpg"))
+                    viz_filename = f"viz_{tree_count:03d}_{class_name}_{face_name}.jpg"
+                    viz_path = os.path.join(viz_dir, viz_filename)
+                    self.create_visualization(face_name, detection, tree_bounds, viz_path)
         
         # Guardar metadatos de todos los árboles extraídos
         metadata_path = os.path.join(output_dir, "extracted_trees_metadata.json")
@@ -407,8 +425,8 @@ def main():
                        help="Tamaño de las caras del cubemap")
     parser.add_argument("--confidence", type=float, default=0.3, 
                        help="Umbral mínimo de confianza")
-    parser.add_argument("--classes", type=int, nargs='+', default=[3], 
-                       help="IDs de clases a extraer (por defecto: 3 para árboles)")
+    parser.add_argument("--classes", type=int, nargs='+', default=[0, 3], 
+                       help="IDs de clases a extraer (por defecto: 0=alcorques, 3=árboles)")
     
     args = parser.parse_args()
     
