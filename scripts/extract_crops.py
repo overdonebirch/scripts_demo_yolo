@@ -35,12 +35,10 @@ class CubemapCropExtractor:
         
         # Mapeo de clases (puedes personalizarlo)
         self.class_names = {
-            0: "arbusto",
-            1: "clase1", 
-            2: "roca",
+            0: "alcorque",
+            1: "luz_trafico", 
+            2: "señal_trafico",
             3: "arbol",
-            4: "clase4",
-            5: "clase5"
         }
     
     def expand_bbox(self, bbox, expansion_factor=0.1, min_expansion=10):
