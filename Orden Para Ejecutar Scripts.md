@@ -20,3 +20,7 @@ python .\scripts\extract_full_trees.py -e imagen_360_original.jpg -d .\nombre_ca
 python analizador_arboles.py carpeta_output/ --api-key TU_API_KEY --resumen
 
 (Los resultados se guardan en la carpeta resultados en la raiz)
+
+## Ejecutar Pipeline : 
+
+python pipeline.py -i .\imagenes\c_fernando_el_santo.jpg -m .\nombre_modelo.pt -r .\imagenes_resultados
