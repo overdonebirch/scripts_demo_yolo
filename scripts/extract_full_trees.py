@@ -12,6 +12,7 @@ import argparse
 from dataclasses import dataclass
 from typing import List, Tuple, Dict, Optional
 import math
+from collections import defaultdict
 
 @dataclass
 class TreeDetection:
@@ -22,6 +23,7 @@ class TreeDetection:
     class_id: int
     yaw: float  # ángulo horizontal en la imagen 360
     pitch: float  # ángulo vertical en la imagen 360
+    bounds: Dict  # límites esféricos del objeto
     
 class TreeExtractor:
     def __init__(self, equirect_path: str, detections_json: str, cube_size: int = 4096):
@@ -56,6 +58,13 @@ class TreeExtractor:
             'left': {'yaw': 270, 'pitch': 0},
             'zenith': {'yaw': 0, 'pitch': 90},
             'nadir': {'yaw': 0, 'pitch': -90}
+        }
+        
+        # Aspect ratios típicos por clase
+        self.typical_aspect_ratios = {
+            0: 1.0,   # Alcorques suelen ser más o menos cuadrados
+            3: 1.5,   # Árboles suelen ser más altos que anchos (ratio altura/ancho)
+            2: 1.2    # Clase 2 (ajustar según necesidad)
         }
         
     def face_coords_to_spherical(self, x: float, y: float, face_name: str) -> Tuple[float, float]:
@@ -148,6 +157,10 @@ class TreeExtractor:
         Returns:
             Diccionario con los límites del árbol
         """
+        # Obtener aspect ratio típico para la clase
+        typical_ratio = self.typical_aspect_ratios.get(class_id, 1.3)
+        current_ratio = initial_height / max(initial_width, 0.1)  # Evitar división por cero
+        
         # Lógica diferente según la clase
         if class_id == 0:  # Alcorque (elemento en el suelo)
             # Para alcorques, expansión mínima ya que están bien definidos en el suelo
@@ -171,6 +184,15 @@ class TreeExtractor:
                 expand_top = 1.5
             
             expand_sides = 1.3  # Expansión lateral para capturar ramas
+            
+            # Ajuste adaptativo basado en aspect ratio
+            if current_ratio < typical_ratio * 0.7:
+                # El bbox detectado es más ancho de lo esperado, expandir más verticalmente
+                expand_bottom *= 1.3
+                expand_top *= 1.3
+            elif current_ratio > typical_ratio * 1.3:
+                # El bbox detectado es más alto de lo esperado, expandir más horizontalmente
+                expand_sides *= 1.3
         
         # Calcular nuevos límites
         tree_bounds = {
@@ -245,6 +267,110 @@ class TreeExtractor:
         
         return tree_crop
     
+    def check_overlap(self, bounds1: Dict, bounds2: Dict, class1: int, class2: int) -> bool:
+        """
+        Verifica si dos detecciones se solapan significativamente
+        
+        Args:
+            bounds1, bounds2: Límites esféricos de las detecciones
+            class1, class2: Clases de las detecciones
+            
+        Returns:
+            True si las detecciones se solapan significativamente
+        """
+        # Solo combinar detecciones de la misma clase
+        if class1 != class2:
+            return False
+            
+        # Calcular solapamiento en yaw (considerando wrap-around en 180°)
+        yaw_diff = abs(bounds1['center_yaw'] - bounds2['center_yaw'])
+        if yaw_diff > 180:
+            yaw_diff = 360 - yaw_diff
+            
+        # Calcular solapamiento en pitch
+        pitch_diff = abs(bounds1['center_pitch'] - bounds2['center_pitch'])
+        
+        # Umbrales de solapamiento según la clase
+        if class1 == 0:  # Alcorques
+            yaw_threshold = 15  # Grados
+            pitch_threshold = 10
+        else:  # Árboles y otros
+            yaw_threshold = 25  # Los árboles pueden ser más grandes
+            pitch_threshold = 20
+            
+        return yaw_diff < yaw_threshold and pitch_diff < pitch_threshold
+    
+    def merge_detections(self, detections: List[TreeDetection]) -> List[TreeDetection]:
+        """
+        Combina detecciones que corresponden al mismo objeto visto desde diferentes caras
+        
+        Args:
+            detections: Lista de todas las detecciones
+            
+        Returns:
+            Lista de detecciones combinadas
+        """
+        if len(detections) <= 1:
+            return detections
+            
+        # Agrupar detecciones por proximidad
+        merged = []
+        used = set()
+        
+        for i, det1 in enumerate(detections):
+            if i in used:
+                continue
+                
+            # Buscar detecciones que se solapen con esta
+            overlapping = [det1]
+            used.add(i)
+            
+            for j, det2 in enumerate(detections[i+1:], i+1):
+                if j in used:
+                    continue
+                    
+                if self.check_overlap(det1.bounds, det2.bounds, det1.class_id, det2.class_id):
+                    overlapping.append(det2)
+                    used.add(j)
+            
+            # Combinar las detecciones solapadas
+            if len(overlapping) > 1:
+                # Usar la detección con mayor confianza como base
+                best_det = max(overlapping, key=lambda d: d.confidence)
+                
+                # Expandir los límites para incluir todas las detecciones
+                min_yaw = min(d.bounds['yaw_min'] for d in overlapping)
+                max_yaw = max(d.bounds['yaw_max'] for d in overlapping)
+                min_pitch = min(d.bounds['pitch_min'] for d in overlapping)
+                max_pitch = max(d.bounds['pitch_max'] for d in overlapping)
+                
+                # Crear detección combinada
+                combined_bounds = {
+                    'center_yaw': (min_yaw + max_yaw) / 2,
+                    'center_pitch': (min_pitch + max_pitch) / 2,
+                    'yaw_min': min_yaw,
+                    'yaw_max': max_yaw,
+                    'pitch_min': min_pitch,
+                    'pitch_max': max_pitch,
+                }
+                
+                combined_det = TreeDetection(
+                    face_name=f"combined_{len(overlapping)}_faces",
+                    bbox=best_det.bbox,
+                    confidence=max(d.confidence for d in overlapping),
+                    class_id=best_det.class_id,
+                    yaw=combined_bounds['center_yaw'],
+                    pitch=combined_bounds['center_pitch'],
+                    bounds=combined_bounds
+                )
+                
+                merged.append(combined_det)
+                print(f"  Combinadas {len(overlapping)} detecciones del mismo objeto")
+            else:
+                merged.append(det1)
+                
+        return merged
+    
     def process_detections(self, output_dir: str = "extracted_trees", 
                           confidence_threshold: float = 0.3,
                           target_classes: List[int] = [0, 3]):  # Incluir alcorques (0) y árboles (3)
@@ -256,7 +382,10 @@ class TreeExtractor:
             confidence_threshold: Umbral mínimo de confianza
             target_classes: Lista de IDs de clases a extraer (árboles)
         """
-        os.makedirs(output_dir, exist_ok=True)
+        trees_dir = os.path.join(output_dir, "trees")
+        planters_dir = os.path.join(output_dir, "planters") 
+        os.makedirs(trees_dir, exist_ok=True)
+        os.makedirs(planters_dir, exist_ok=True)
         
         # Crear subdirectorio para visualizaciones
         viz_dir = os.path.join(output_dir, "viz")
@@ -264,7 +393,10 @@ class TreeExtractor:
         
         tree_count = 0
         extracted_trees = []
+        all_detections = []
         
+        # Primero, recopilar todas las detecciones con sus coordenadas esféricas
+        print("=== FASE 1: Recopilando detecciones ===")
         for face_name, face_data in self.detections.items():
             if face_data['num_detections'] == 0:
                 continue
@@ -307,44 +439,85 @@ class TreeExtractor:
                                                       bbox_width_deg, bbox_height_deg,
                                                       detection['class'])
                 
-                # Extraer árbol de la imagen equirectangular
-                tree_crop = self.extract_tree_from_equirect(tree_bounds)
+                # Crear objeto TreeDetection
+                tree_det = TreeDetection(
+                    face_name=face_name,
+                    bbox=detection['coordinates'],
+                    confidence=detection['score'],
+                    class_id=detection['class'],
+                    yaw=center_yaw,
+                    pitch=center_pitch,
+                    bounds=tree_bounds
+                )
                 
-                # Verificar que el crop no esté vacío
-                if tree_crop.size == 0 or tree_crop.shape[0] == 0 or tree_crop.shape[1] == 0:
-                    print(f"  ADVERTENCIA: Crop vacío, saltando esta detección")
-                    continue
-                
-                # Guardar imagen
-                class_names = {0: "alcorque", 2: "class2", 3: "tree"}
-                class_name = class_names.get(detection['class'], f"class{detection['class']}")
-                filename = f"{class_name}_{tree_count:03d}_{face_name}_conf{detection['score']:.2f}.jpg"
-                filepath = os.path.join(output_dir, filename)
-                cv2.imwrite(filepath, tree_crop, [cv2.IMWRITE_JPEG_QUALITY, 95])
-                
-                print(f"  Guardado: {filename} (tamaño: {tree_crop.shape[1]}x{tree_crop.shape[0]})")
-                
-                # Guardar metadatos
-                tree_info = {
-                    'id': tree_count,
-                    'filename': filename,
-                    'source_face': face_name,
-                    'confidence': detection['score'],
-                    'class': detection['class'],
-                    'original_bbox': detection['coordinates'],
-                    'spherical_center': {'yaw': center_yaw, 'pitch': center_pitch},
-                    'extracted_bounds': tree_bounds,
-                    'crop_size': {'width': tree_crop.shape[1], 'height': tree_crop.shape[0]}
+                all_detections.append(tree_det)
+        
+        # Combinar detecciones del mismo objeto
+        print("\n=== FASE 2: Combinando detecciones solapadas ===")
+        merged_detections = self.merge_detections(all_detections)
+        print(f"Detecciones originales: {len(all_detections)}")
+        print(f"Detecciones después de combinar: {len(merged_detections)}")
+        
+        # Procesar las detecciones combinadas
+        print("\n=== FASE 3: Extrayendo objetos ===")
+        for det in merged_detections:
+            # Extraer árbol de la imagen equirectangular
+            tree_crop = self.extract_tree_from_equirect(det.bounds)
+            
+            # Verificar que el crop no esté vacío
+            if tree_crop.size == 0 or tree_crop.shape[0] == 0 or tree_crop.shape[1] == 0:
+                print(f"  ADVERTENCIA: Crop vacío, saltando esta detección")
+                continue
+    
+            # Generar nombre de archivo
+            class_names = {0: "alcorque", 1: "luz_trafico", 2: "señal_trafico", 3: "arbol"}
+            class_name = class_names.get(det.class_id, f"class{det.class_id}")
+            filename = f"{class_name}_{tree_count:03d}_{det.face_name}_conf{det.confidence:.2f}.jpg"
+    
+            # Determinar directorio según clase
+            if det.class_id == 0:  # alcorques
+                target_dir = planters_dir
+            elif det.class_id == 3:  # árboles
+                target_dir = trees_dir
+            else:
+                target_dir = output_dir  # otros van al directorio base
+    
+            # Guardar imagen en el directorio correcto
+            filepath = os.path.join(target_dir, filename)
+            cv2.imwrite(filepath, tree_crop, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    
+            print(f"  Guardado: {filename} en {os.path.basename(target_dir)}/ (tamaño: {tree_crop.shape[1]}x{tree_crop.shape[0]})")
+    
+            # Guardar metadatos (con ruta relativa al subdirectorio)
+            relative_filepath = os.path.join(os.path.basename(target_dir), filename)
+            tree_info = {
+                'id': tree_count,
+                'filename': filename,
+                'filepath': relative_filepath,  # Ruta relativa para facilitar acceso
+                'directory': os.path.basename(target_dir),  # trees/planters
+                'source_face': det.face_name,
+                'confidence': det.confidence,
+                'class': det.class_id,
+                'original_bbox': det.bbox,
+                'spherical_center': {'yaw': det.yaw, 'pitch': det.pitch},
+                'extracted_bounds': det.bounds,
+                'crop_size': {'width': tree_crop.shape[1], 'height': tree_crop.shape[0]}
+            }
+            extracted_trees.append(tree_info)
+    
+            tree_count += 1
+    
+            # Opcionalmente, crear una visualización con el bbox original y expandido
+            if tree_count <= 5:  # Solo para los primeros árboles
+                viz_filename = f"viz_{tree_count:03d}_{class_name}_{det.face_name}.jpg"
+                viz_path = os.path.join(viz_dir, viz_filename)
+                # Crear diccionario de detección para compatibilidad
+                detection_dict = {
+                    'coordinates': det.bbox,
+                    'score': det.confidence,
+                    'class': det.class_id
                 }
-                extracted_trees.append(tree_info)
-                
-                tree_count += 1
-                
-                # Opcionalmente, crear una visualización con el bbox original y expandido
-                if tree_count <= 5:  # Solo para los primeros árboles
-                    viz_filename = f"viz_{tree_count:03d}_{class_name}_{face_name}.jpg"
-                    viz_path = os.path.join(viz_dir, viz_filename)
-                    self.create_visualization(face_name, detection, tree_bounds, viz_path)
+                self.create_visualization(det.face_name, detection_dict, det.bounds, viz_path)
         
         # Guardar metadatos de todos los árboles extraídos
         metadata_path = os.path.join(output_dir, "extracted_trees_metadata.json")
@@ -366,21 +539,23 @@ class TreeExtractor:
         # Crear copia de la imagen equirectangular
         viz_img = self.equirect_img.copy()
         
-        # Dibujar el bbox original proyectado
-        x1, y1, x2, y2 = detection['coordinates']
-        corners = [
-            (x1, y1), (x2, y1), (x2, y2), (x1, y2)
-        ]
-        
-        # Proyectar esquinas a la imagen equirectangular
-        prev_point = None
-        for corner in corners + [corners[0]]:  # Cerrar el polígono
-            yaw, pitch = self.face_coords_to_spherical(corner[0], corner[1], face_name)
-            x, y = self.spherical_to_equirect(yaw, pitch)
+        # Solo dibujar el bbox original si no es una detección combinada
+        if not face_name.startswith("combined_"):
+            # Dibujar el bbox original proyectado
+            x1, y1, x2, y2 = detection['coordinates']
+            corners = [
+                (x1, y1), (x2, y1), (x2, y2), (x1, y2)
+            ]
             
-            if prev_point is not None:
-                cv2.line(viz_img, prev_point, (x, y), (0, 0, 255), 3)  # Rojo para bbox original
-            prev_point = (x, y)
+            # Proyectar esquinas a la imagen equirectangular
+            prev_point = None
+            for corner in corners + [corners[0]]:  # Cerrar el polígono
+                yaw, pitch = self.face_coords_to_spherical(corner[0], corner[1], face_name)
+                x, y = self.spherical_to_equirect(yaw, pitch)
+                
+                if prev_point is not None:
+                    cv2.line(viz_img, prev_point, (x, y), (0, 0, 255), 3)  # Rojo para bbox original
+                prev_point = (x, y)
         
         # Dibujar el área expandida
         expanded_corners = [
@@ -395,7 +570,9 @@ class TreeExtractor:
             x, y = self.spherical_to_equirect(yaw, pitch)
             
             if prev_point is not None:
-                cv2.line(viz_img, prev_point, (x, y), (0, 255, 0), 3)  # Verde para área expandida
+                # Color diferente para detecciones combinadas
+                color = (0, 255, 255) if face_name.startswith("combined_") else (0, 255, 0)
+                cv2.line(viz_img, prev_point, (x, y), color, 3)
             prev_point = (x, y)
         
         # Marcar el centro
