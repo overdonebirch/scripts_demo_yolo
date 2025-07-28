@@ -23,4 +23,4 @@ python analizador_arboles.py carpeta_output/ --api-key TU_API_KEY --resumen
 
 ## Ejecutar Pipeline : 
 
-python pipeline.py -i .\imagenes\c_fernando_el_santo.jpg -m .\nombre_modelo.pt -r .\imagenes_resultados
+python pipeline.py -i .\imagenes\c_fernando_el_santo.jpg -m .\nombre_modelo.pt -r .\imagenes_resultados --api-key TU_API_KEY
