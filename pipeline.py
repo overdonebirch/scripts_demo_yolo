@@ -10,6 +10,11 @@ import subprocess
 import argparse
 from pathlib import Path
 
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
+
 def run_command(command, description):
     """Ejecuta un comando y maneja errores"""
     print(f"\n🔄 {description}...")
@@ -41,6 +46,7 @@ def main():
     parser.add_argument("-m", "--model", required=True, help="Ruta al modelo YOLO (.pt)")
     parser.add_argument("-r", "--results-dir", default="imagenes_resultados", 
                        help="Directorio base de resultados (por defecto: imagenes_resultados)")
+    parser.add_argument("--api-key", required=True, help="API key de Gemini")
     
     args = parser.parse_args()
     
@@ -140,7 +146,67 @@ def main():
     if not run_command(extract_cmd, "Extracción de árboles completos"):
         print("❌ Pipeline abortado en el paso 3")
         sys.exit(1)
-    
+        
+    # Paso 4: Analizar con IA
+    print(f"\n{'='*60}")
+    print("PASO 4: Analizar recortes con IA")
+    print(f"{'='*60}")
+
+    # Crear directorio de resultados
+    results_dir = main_dir / "results"
+    create_directory(results_dir)
+
+    # Verificar si existen subdirectorios y analizarlos
+    trees_dir = full_trees_dir / "trees"
+    planters_dir = full_trees_dir / "planters"
+
+    # Analizar árboles si existen
+    if trees_dir.exists() and any(trees_dir.iterdir()):
+        trees_output = results_dir / "arboles_results.json"
+        analyze_trees_cmd = [
+            "python", str(script_dir / "analizador_arboles.py"),
+            str(trees_dir),
+            "--api-key", args.api_key,
+            "--tipo", "arboles",
+            "--output", str(trees_output),
+            "--resumen"
+        ]
+        
+        if run_command(analyze_trees_cmd, "Análisis de árboles con IA"):
+            print(f"📄 Resultados de árboles guardados en: {trees_output}")
+        else:
+            print(f"❌ Error analizando árboles")
+    else:
+        print(f"⚠️  No se encontraron árboles para analizar")
+
+    # Analizar alcorques si existen
+    if planters_dir.exists() and any(planters_dir.iterdir()):
+        planters_output = results_dir / "alcorques_results.json"
+        analyze_planters_cmd = [
+            "python", str(script_dir / "analizador_arboles.py"),
+            str(planters_dir),
+            "--api-key", args.api_key,
+            "--tipo", "alcorques",
+            "--output", str(planters_output),
+            "--resumen"
+        ]
+        
+        if run_command(analyze_planters_cmd, "Análisis de alcorques con IA"):
+            print(f"📄 Resultados de alcorques guardados en: {planters_output}")
+        else:
+            print(f"❌ Error analizando alcorques")
+    else:
+        print(f"⚠️  No se encontraron alcorques para analizar")
+
+    # Mostrar resumen de archivos generados
+    print(f"\n📋 Archivos de resultados generados:")
+    if (results_dir / "arboles_results.json").exists():
+        print(f"   ✅ {results_dir / 'arboles_results.json'}")
+    if (results_dir / "alcorques_results.json").exists():
+        print(f"   ✅ {results_dir / 'alcorques_results.json'}")
+
+    if not any((results_dir / f).exists() for f in ["arboles_results.json", "alcorques_results.json"]):
+        print(f"   ⚠️  No se generaron archivos de resultados (posiblemente no había imágenes para analizar)")
     # Pipeline completado
     print(f"\n{'='*60}")
     print("🎉 PIPELINE COMPLETADO EXITOSAMENTE")

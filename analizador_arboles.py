@@ -9,6 +9,12 @@ import glob
 from pathlib import Path
 from datetime import datetime
 
+# Fix para codificación en Windows - DEBE IR ANTES DE CUALQUIER PRINT CON EMOJIS
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
+
 class AnalizadorArboles:
     def __init__(self, api_key):
         """Inicializar el analizador con la API key de Gemini"""
