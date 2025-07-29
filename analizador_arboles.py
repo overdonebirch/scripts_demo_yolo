@@ -126,6 +126,9 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
             imagenes.extend(glob.glob(os.path.join(directorio, ext)))
             imagenes.extend(glob.glob(os.path.join(directorio, ext.upper())))
         
+        # Eliminar duplicados (importante en Windows donde los nombres no son case-sensitive)
+        imagenes = list(set(imagenes))
+        
         if not imagenes:
             print(f"❌ No se encontraron imágenes en {directorio}")
             return []
@@ -286,6 +289,10 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
         for ext in extensiones:
             imagenes.extend(glob.glob(os.path.join(directorio, ext)))
             imagenes.extend(glob.glob(os.path.join(directorio, ext.upper())))
+        
+        # Eliminar duplicados (importante en Windows donde los nombres no son case-sensitive)
+        imagenes = list(set(imagenes))
+        
         if not imagenes:
             print(f"❌ No se encontraron imágenes de alcorques en {directorio}")
             return []

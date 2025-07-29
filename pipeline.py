@@ -8,6 +8,7 @@ import os
 import sys
 import subprocess
 import argparse
+import shutil
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -21,20 +22,33 @@ def run_command(command, description):
     print(f"Ejecutando: {' '.join(command)}")
     
     try:
-        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        # Usar UTF-8 para evitar problemas de codificación en Windows
+        result = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', errors='replace')
         print(f"✅ {description} completado exitosamente")
         if result.stdout:
             print(f"Output: {result.stdout}")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ Error en {description}")
-        print(f"Error: {e.stderr}")
+        if e.stderr:
+            print(f"Error: {e.stderr}")
         return False
 
 def create_directory(path):
     """Crea un directorio si no existe"""
     Path(path).mkdir(parents=True, exist_ok=True)
     print(f"📁 Directorio creado/verificado: {path}")
+
+def copy_original_image(source_image, destination_dir):
+    """Copia la imagen original al directorio de destino con nombre fijo"""
+    destination_path = Path(destination_dir) / "imagen_360_original.jpg"
+    try:
+        shutil.copy2(source_image, destination_path)
+        print(f"📸 Imagen original copiada a: {destination_path}")
+        return True
+    except Exception as e:
+        print(f"❌ Error al copiar imagen original: {e}")
+        return False
 
 def get_image_name_without_extension(image_path):
     """Obtiene el nombre de la imagen sin extensión"""
@@ -92,6 +106,14 @@ def main():
     create_directory(faces_dir)
     create_directory(detections_dir)
     create_directory(full_trees_dir)
+    
+    # Copiar imagen original
+    print(f"\n{'='*60}")
+    print("PASO 0: Copiar imagen 360° original")
+    print(f"{'='*60}")
+    
+    if not copy_original_image(args.image, main_dir):
+        print("⚠️ Advertencia: No se pudo copiar la imagen original, pero el pipeline continuará")
     
     # Paso 1: Convertir imagen 360° en caras
     print(f"\n{'='*60}")
@@ -212,6 +234,7 @@ def main():
     print("🎉 PIPELINE COMPLETADO EXITOSAMENTE")
     print(f"{'='*60}")
     print(f"📂 Resultados guardados en: {main_dir}")
+    print(f"   ├── imagen_360_original.jpg (imagen 360° original)")
     print(f"   ├── {faces_dir.name}/ (caras de la imagen 360°)")
     print(f"   ├── {detections_dir.name}/ (detecciones YOLO)")
     print(f"   └── {full_trees_dir.name}/ (árboles extraídos)")
