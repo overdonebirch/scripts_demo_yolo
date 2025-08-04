@@ -15,6 +15,22 @@ if sys.platform == "win32":
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
     sys.stderr = codecs.getwriter("utf-8")(sys.stderr.detach())
 
+def leer_prompt_desde_archivo(nombre_archivo):
+    """Lee el contenido de un archivo de prompt y lo devuelve como string"""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        ruta_prompt = os.path.join(script_dir, nombre_archivo)
+        
+        with open(ruta_prompt, 'r', encoding='utf-8') as archivo:
+            return archivo.read().strip()
+    except FileNotFoundError:
+        print(f"❌ Error: No se encontró el archivo de prompt '{nombre_archivo}'")
+        print(f"   Asegúrate de que el archivo existe en el mismo directorio que el script.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error al leer el archivo de prompt '{nombre_archivo}': {e}")
+        sys.exit(1)
+
 class AnalizadorArboles:
     def __init__(self, api_key):
         """Inicializar el analizador con la API key de Gemini"""
@@ -26,24 +42,16 @@ class AnalizadorArboles:
         try:
             imagen = Image.open(imagen_path)
             
-            prompt = """Como experto arboricultor, analiza esta imagen y responde las siguientes preguntas:
-
-1. ¿El árbol está interfiriendo con la visibilidad de señales o semáforos? Indica si la obstrucción es parcial o total.
-2. ¿Se observan ramas o follaje tocando o muy próximas a fachadas, farolas u otros elementos construidos? Clasifica la severidad: leve, moderada o severa.
-3. ¿Presenta el árbol síntomas de mal estado (coloración anómala, baja densidad foliar, grietas, ramas rotas, inclinación peligrosa)? Enumera los síntomas detectados.
-4. ¿Hay ramas que proyecten sobre la calzada por debajo de 4,5 m o sobre la acera por debajo de 2,2 m? Señala ubicación y grado de severidad.
-5. ¿Aparecen estructuras de gran tamaño (> 40 cm) en la copa, como nidos de cotorras? Describe su diámetro aproximado y posición en el árbol.
-
-Responde SOLO en formato JSON válido con la siguiente estructura:
-{
-    "interferencia_senales": "...",
-    "ramas_follaje": "...",
-    "sintomas_mal_estado": "...",
-    "ramas_circulacion": "...",
-    "estructuras_copa": "...",
-    "descripcion": "descripción breve"
-}
-"""
+            # Obtener información del archivo
+            nombre_archivo = os.path.basename(imagen_path)
+            id_imagen = nombre_archivo[:7]
+            ruta_imagen = imagen_path
+            
+            # Leer el prompt desde el archivo externo
+            prompt_base = leer_prompt_desde_archivo('prompt_arbol.txt')
+            
+            # Agregar información de la imagen al prompt
+            prompt = f"{prompt_base}\n\nPara esta imagen:\n- id_imagen: {id_imagen}\n- nombre_archivo: {nombre_archivo}\n- ruta_imagen: {ruta_imagen}\n- tipo_analisis: arbol\n\nIncluye esta información en los primeros campos de tu respuesta CSV."
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -62,47 +70,76 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
         print(f"🌳 Analizando: {Path(imagen_path).name}")
         
         try:
-            analisis_texto = self.analizar_arbol(imagen_path)
+            analisis_csv = self.analizar_arbol(imagen_path)
             
-            # Intentar parsear JSON
+            # Procesar respuesta CSV
             try:
                 # Limpiar markdown si está presente
-                texto_limpio = analisis_texto.strip()
-                if texto_limpio.startswith('```json'):
-                    texto_limpio = texto_limpio[7:]  # Remover ```json
-                if texto_limpio.endswith('```'):
-                    texto_limpio = texto_limpio[:-3]  # Remover ```
-                texto_limpio = texto_limpio.strip()
+                texto_limpio = analisis_csv.strip()
+                if texto_limpio.startswith('```csv') or texto_limpio.startswith('```'):
+                    lines = texto_limpio.split('\n')
+                    # Encontrar la línea que contiene los datos CSV
+                    csv_line = None
+                    for line in lines:
+                        if ',' in line and not line.startswith('#') and not line.startswith('|'):
+                            csv_line = line.strip()
+                            break
+                    if csv_line:
+                        texto_limpio = csv_line
+                    else:
+                        texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
                 
-                analisis = json.loads(texto_limpio)
-            except json.JSONDecodeError:
-                # Si no es JSON válido, crear estructura básica
+                # Parsear CSV: id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,nivel_severidad,requiere_intervencion,prioridad,confianza_modelo,estado_general,error
+                campos = [campo.strip() for campo in texto_limpio.split(',')]
+                
+                if len(campos) >= 11:
+                    analisis = {
+                        "id_imagen": campos[0],
+                        "nombre_archivo": campos[1],
+                        "ruta_imagen": campos[2],
+                        "tipo_analisis": campos[3],
+                        "descripcion_incidencia": campos[4],
+                        "nivel_severidad": campos[5],
+                        "requiere_intervencion": campos[6].lower() == 'true',
+                        "prioridad": campos[7],
+                        "confianza_modelo": campos[8],
+                        "estado_general": campos[9],
+                        "error": campos[10],
+                        "hay_arbol": campos[4] != "sin incidencias" and campos[4] != "no detectada",
+                        "analisis_csv_completo": texto_limpio
+                    }
+                else:
+                    raise ValueError(f"CSV incompleto: se esperaban 11 campos, se obtuvieron {len(campos)}")
+                    
+            except Exception as e:
+                # Si no se puede parsear el CSV, crear estructura básica
                 analisis = {
-                    "hay_arbol": "árbol" in analisis_texto.lower(),
+                    "hay_arbol": "árbol" in analisis_csv.lower() or "tree" in analisis_csv.lower(),
                     "estado_general": "indeterminado",
-                    "riesgo_nivel": 5,
-                    "descripcion": "Análisis no estructurado",
-                    "analisis_texto": analisis_texto
+                    "descripcion_incidencia": "Análisis no estructurado",
+                    "requiere_intervencion": False,
+                    "error": f"Error parseando CSV: {str(e)}",
+                    "analisis_texto_original": analisis_csv
                 }
             
             # Mostrar resumen en consola
             if analisis.get('hay_arbol', False):
                 estado = analisis.get('estado_general', 'indeterminado')
-                riesgo = analisis.get('riesgo_nivel', 0)
-                descripcion = analisis.get('descripcion', '')
+                descripcion = analisis.get('descripcion_incidencia', '')
+                severidad = analisis.get('nivel_severidad', '')
+                requiere_intervencion = analisis.get('requiere_intervencion', False)
+                prioridad = analisis.get('prioridad', '')
+                
                 print(f"   ✅ Árbol detectado")
                 print(f"   📊 Estado: {estado}")
-                print(f"   ⚠️  Riesgo: {riesgo}/10")
-                if descripcion:
+                if severidad:
+                    print(f"   ⚠️  Severidad: {severidad}")
+                if descripcion and descripcion != 'sin incidencias':
                     print(f"   📝 {descripcion}")
-                
-                problemas = analisis.get('problemas', [])
-                if problemas:
-                    print(f"   🚨 Problemas: {', '.join(problemas)}")
-                    
-                obstrucciones = analisis.get('obstrucciones', [])
-                if obstrucciones:
-                    print(f"   🚧 Obstrucciones: {', '.join(obstrucciones)}")
+                if requiere_intervencion:
+                    print(f"   🚨 Requiere intervención")
+                    if prioridad:
+                        print(f"   🔴 Prioridad: {prioridad}")
             else:
                 print(f"   ⚪ No se detectó árbol en esta imagen")
             
@@ -225,26 +262,16 @@ class AnalizadorAlcorques:
         try:
             imagen = Image.open(imagen_path)
             
-            prompt = """Como experto en gestión de alcorques, analiza esta imagen y evalúa:
-
-1. ¿Se observan levantamientos, grietas o desplazamientos en el pavimento junto al alcorque? ¿Hay raíces superficiales conectando el daño con el árbol?
-2. ¿El alcorque está completamente vacío (sin árbol ni tocón)? Confirma asimismo la ausencia de plantones o tutores recientes.
-3. ¿Hay basura, escombros u otros objetos no autorizados dentro del alcorque? Describe su naturaleza y volumen aproximado.
-4. ¿Se aprecia un tocón en el alcorque? Indica su altura aproximada y posición relativa al borde.
-5. ¿La cobertura de malas hierbas supera el 50 % de la superficie o su altura excede los 15 cm? Indica densidad y especies dominantes.
-6. ¿Hay presencia de charcos o encharcamientos en el alcorque o acera adyacente? Estima su extensión y si el agua parece estancada o reciente.
-
-Responde SOLO en formato JSON válido con la siguiente estructura:
-{
-    "levantamientos": "...",
-    "alcorque_vacio": true/false,
-    "basura": "...",
-    "tocon": "...",
-    "malas_hierbas": "...",
-    "charcos": "...",
-    "descripcion": "descripción breve"
-}
-"""
+            # Obtener información del archivo
+            nombre_archivo = os.path.basename(imagen_path)
+            id_imagen = nombre_archivo[:7]
+            ruta_imagen = imagen_path
+            
+            # Leer el prompt desde el archivo externo
+            prompt_base = leer_prompt_desde_archivo('prompt_alcorque.txt')
+            
+            # Agregar información de la imagen al prompt
+            prompt = f"{prompt_base}\n\nPara esta imagen:\n- id_imagen: {id_imagen}\n- nombre_archivo: {nombre_archivo}\n- ruta_imagen: {ruta_imagen}\n- tipo_analisis: alcorque\n\nIncluye esta información en los primeros campos de tu respuesta CSV."
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -260,21 +287,73 @@ Responde SOLO en formato JSON válido con la siguiente estructura:
         print(f"🛠️ Analizando alcorque: {Path(imagen_path).name}")
         
         try:
-            analisis_texto = self.analizar_alcorque(imagen_path)
+            analisis_csv = self.analizar_alcorque(imagen_path)
+            
+            # Procesar respuesta CSV
             try:
                 # Limpiar markdown si está presente
-                texto_limpio = analisis_texto.strip()
-                if texto_limpio.startswith('```json'):
-                    texto_limpio = texto_limpio[7:]  # Remover ```json
-                if texto_limpio.endswith('```'):
-                    texto_limpio = texto_limpio[:-3]  # Remover ```
-                texto_limpio = texto_limpio.strip()
+                texto_limpio = analisis_csv.strip()
+                if texto_limpio.startswith('```csv') or texto_limpio.startswith('```'):
+                    lines = texto_limpio.split('\n')
+                    # Encontrar la línea que contiene los datos CSV
+                    csv_line = None
+                    for line in lines:
+                        if ',' in line and not line.startswith('#') and not line.startswith('|'):
+                            csv_line = line.strip()
+                            break
+                    if csv_line:
+                        texto_limpio = csv_line
+                    else:
+                        texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
                 
-                analisis = json.loads(texto_limpio)
-            except json.JSONDecodeError:
+                # Parsear CSV: id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,nivel_severidad,requiere_intervencion,prioridad,confianza_modelo,estado_general,error
+                campos = [campo.strip() for campo in texto_limpio.split(',')]
+                
+                if len(campos) >= 11:
+                    analisis = {
+                        "id_imagen": campos[0],
+                        "nombre_archivo": campos[1],
+                        "ruta_imagen": campos[2],
+                        "tipo_analisis": campos[3],
+                        "descripcion_incidencia": campos[4],
+                        "nivel_severidad": campos[5],
+                        "requiere_intervencion": campos[6].lower() == 'true',
+                        "prioridad": campos[7],
+                        "confianza_modelo": campos[8],
+                        "estado_general": campos[9],
+                        "error": campos[10],
+                        "analisis_csv_completo": texto_limpio
+                    }
+                else:
+                    raise ValueError(f"CSV incompleto: se esperaban 11 campos, se obtuvieron {len(campos)}")
+                    
+            except Exception as e:
+                # Si no se puede parsear el CSV, crear estructura básica
                 analisis = {
-                    "analisis_texto": analisis_texto
+                    "descripcion_incidencia": "Análisis no estructurado",
+                    "requiere_intervencion": False,
+                    "estado_general": "indeterminado",
+                    "error": f"Error parseando CSV: {str(e)}",
+                    "analisis_texto_original": analisis_csv
                 }
+            
+            # Mostrar resumen en consola
+            descripcion = analisis.get('descripcion_incidencia', '')
+            estado = analisis.get('estado_general', 'indeterminado')
+            severidad = analisis.get('nivel_severidad', '')
+            requiere_intervencion = analisis.get('requiere_intervencion', False)
+            prioridad = analisis.get('prioridad', '')
+            
+            print(f"   📊 Estado: {estado}")
+            if severidad:
+                print(f"   ⚠️  Severidad: {severidad}")
+            if descripcion and descripcion != 'sin incidencias':
+                print(f"   📝 {descripcion}")
+            if requiere_intervencion:
+                print(f"   🚨 Requiere intervención")
+                if prioridad:
+                    print(f"   🔴 Prioridad: {prioridad}")
+            
             return analisis
         except Exception as e:
             print(f"   ❌ Error analizando alcorque: {e}")
@@ -342,28 +421,8 @@ class AnalizadorLimpieza:
         try:
             imagen = Image.open(imagen_path)
             
-            prompt = """Como experto Inspector de Limpieza Viaria especializado en arbolado urbano, analiza esta imagen y evalúa:
-
-1. ¿Se observa basura, residuos o escombros en el alcorque del árbol? Describe el tipo y volumen aproximado (papel, plástico, orgánico, escombros, etc.).
-2. ¿Hay residuos acumulados en las ramas del árbol (bolsas de plástico, papel, otros objetos)? Indica ubicación y tipo.
-3. ¿Se detectan papeleras en la imagen? Si es así, ¿están desbordadas o con contenido visible fuera de ellas?
-4. ¿Hay acumulación de residuos en la acera o calzada adyacente al árbol? Clasifica el volumen: puntual, moderado o abundante.
-5. ¿Se observan excrementos de animales en el alcorque o zona inmediata? Indica cantidad aproximada.
-6. ¿El estado general de limpieza de la zona requiere intervención? Evalúa la severidad: leve, moderada o severa.
-
-Responde SOLO en formato JSON válido con la siguiente estructura:
-{
-    "basura_alcorque": "descripción detallada o 'no detectada'",
-    "residuos_ramas": "descripción y ubicación o 'no detectados'",
-    "papeleras_desbordadas": "sí/no con descripción o 'no visible'",
-    "acumulacion_acera": "descripción y volumen o 'no detectada'",
-    "excrementos": "descripción cantidad o 'no detectados'",
-    "estado_general": "limpio/sucio_leve/sucio_moderado/sucio_severo",
-    "requiere_intervencion": true/false,
-    "prioridad": "baja/media/alta",
-    "descripcion": "resumen general del estado de limpieza"
-}
-"""
+            # Leer el prompt desde el archivo externo
+            prompt = leer_prompt_desde_archivo('prompt_limpieza.txt')
             
             response = self.model.generate_content([prompt, imagen])
             return response.text

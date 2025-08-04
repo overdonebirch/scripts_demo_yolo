@@ -1,0 +1,24 @@
+Como experto arboricultor, analiza esta imagen y responde las siguientes preguntas:
+
+1. ¿El árbol está interfiriendo con la visibilidad de señales o semáforos? Indica si la obstrucción es parcial o total.
+2. ¿Se observan ramas o follaje tocando o muy próximas a fachadas, farolas u otros elementos construidos? Clasifica la severidad: leve, moderada o severa.
+3. ¿Presenta el árbol síntomas de mal estado (coloración anómala, baja densidad foliar, grietas, ramas rotas, inclinación peligrosa)? Enumera los síntomas detectados.
+4. ¿Hay ramas que proyecten sobre la calzada por debajo de 4,5 m o sobre la acera por debajo de 2,2 m? Señala ubicación y grado de severidad.
+5. ¿Aparecen estructuras de gran tamaño (> 40 cm) en la copa, como nidos de cotorras? Describe su diámetro aproximado y posición en el árbol.
+6. ¿Hay acumulación de residuos en la acera o calzada adyacente al árbol?
+7. ¿El estado general de la vegetación sugiere necesidad de desbroce?
+8. ¿Requiere intervención inmediata o programada?
+
+Responde SOLO en formato CSV (tabla) con UNA SOLA FILA de datos (sin encabezados). Los campos deben estar separados por comas y en este orden exacto:
+id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,error
+
+Donde:
+- id_imagen: Se proporcionará automáticamente
+- nombre_archivo: Se proporcionará automáticamente
+- ruta_imagen: Se proporcionará automáticamente
+- tipo_analisis: "arbol"
+- requiere_intervencion: true o false
+- confianza_modelo: Porcentaje de confianza (ej: 85) o vacío
+- estado_general: "saludable", "vacío", "deteriorado"
+- descripcion_incidencia: Resumen conciso de todos los problemas detectados o "sin incidencias". Elabora esta descripción dependiendo del estado_general. Por ejemplo, si el estado_general es "saludable", la descripción debe ser "sin incidencias".
+- error: Vacío (se manejará automáticamente)

@@ -1,0 +1,25 @@
+Como experto Inspector de Limpieza Viaria especializado en arbolado urbano, analiza esta imagen y evalúa:
+
+1. ¿Se observa basura, residuos o escombros en el alcorque del árbol? Describe el tipo y volumen aproximado (papel, plástico, orgánico, escombros, etc.).
+2. ¿Hay residuos acumulados en las ramas del árbol (bolsas de plástico, papel, otros objetos)? Indica ubicación y tipo.
+3. ¿Se detectan papeleras en la imagen? Si es así, ¿están desbordadas o con contenido visible fuera de ellas?
+4. ¿Hay acumulación de residuos en la acera o calzada adyacente al árbol? 
+5. ¿Se observan excrementos de animales en el alcorque o zona inmediata? Indica cantidad aproximada.
+8. ¿El estado general de la vegetación sugiere necesidad de desbroce? 
+
+
+6. ¿El estado general de limpieza de la zona requiere intervención? Evalúa la severidad: leve, moderada o severa.
+
+Responde SOLO en formato JSON válido con la siguiente estructura:
+{
+    "basura_alcorque": "descripción detallada o 'no detectada'",
+    "residuos_ramas": "descripción y ubicación o 'no detectados'",
+    "papeleras_desbordadas": "sí/no con descripción o 'no visible'",
+    "acumulacion_acera": "descripción y volumen o 'no detectada'",
+    "excrementos": "descripción cantidad o 'no detectados'",
+    "estado_general": "limpio/sucio_leve/sucio_moderado/sucio_severo",
+    "requiere_intervencion": true/false,
+    "necesidad_desbroce": true/false,
+    "prioridad": "baja/media/alta",
+    "descripcion": "resumen general del estado de limpieza"
+}
