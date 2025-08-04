@@ -34,50 +34,6 @@ def run_command(command, description):
             print(f"Error: {e.stderr}")
         return False
 
-def validate_360_image(image_path):
-    """Valida si una imagen es 360°"""
-    try:
-        script_dir = Path(__file__).parent
-        scripts_dir = script_dir / "scripts"
-        validator_script = scripts_dir / "image_validator.py"
-        
-        if not validator_script.exists():
-            return True  # Si no existe validador, procesar de todos modos
-        
-        sys.path.insert(0, str(scripts_dir))
-        from image_validator import ImageValidator
-        
-        validator = ImageValidator()
-        is_360 = validator.is_360_image(image_path, verbose=False)
-        return is_360
-        
-    except:
-        return True  # Si hay error, procesar de todos modos
-
-def get_image_files(input_path):
-    """Obtiene lista de archivos de imagen"""
-    image_extensions = ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']
-    image_files = []
-    
-    if '*' in input_path:
-        matched_files = glob.glob(input_path)
-        for file_path in matched_files:
-            if Path(file_path).suffix.lower() in image_extensions:
-                image_files.append(file_path)
-    else:
-        input_path = Path(input_path)
-        
-        if input_path.is_file():
-            if input_path.suffix.lower() in image_extensions:
-                image_files.append(str(input_path))
-        elif input_path.is_dir():
-            for ext in image_extensions:
-                image_files.extend(glob.glob(str(input_path / f"*{ext}")))
-                image_files.extend(glob.glob(str(input_path / f"*{ext.upper()}")))
-            image_files = sorted(list(set(image_files)))
-    
-    return image_files
-
 def create_directory(path):
     """Crea un directorio si no existe"""
     Path(path).mkdir(parents=True, exist_ok=True)
