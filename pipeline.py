@@ -50,6 +50,62 @@ def copy_original_image(source_image, destination_dir):
         print(f"❌ Error al copiar imagen original: {e}")
         return False
 
+def get_image_files(image_path):
+    """Obtiene lista de archivos de imagen desde una ruta (archivo o directorio)"""
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif'}
+    
+    if os.path.isfile(image_path):
+        # Es un archivo individual
+        if Path(image_path).suffix.lower() in image_extensions:
+            return [image_path]
+        else:
+            print(f"❌ El archivo {image_path} no es una imagen válida")
+            return []
+    
+    elif os.path.isdir(image_path):
+        # Es un directorio, buscar imágenes
+        image_files = []
+        for ext in image_extensions:
+            pattern = os.path.join(image_path, f"*{ext}")
+            image_files.extend(glob.glob(pattern))
+            # También buscar en mayúsculas
+            pattern = os.path.join(image_path, f"*{ext.upper()}")
+            image_files.extend(glob.glob(pattern))
+        
+        return sorted(image_files)
+    
+    else:
+        print(f"❌ La ruta {image_path} no existe")
+        return []
+
+def validate_360_image(image_path):
+    """Valida si una imagen es 360° equirectangular basándose en su ratio de aspecto"""
+    try:
+        from PIL import Image
+        
+        with Image.open(image_path) as img:
+            width, height = img.size
+            aspect_ratio = width / height
+            
+            # Las imágenes 360° equirectangulares típicamente tienen un ratio 2:1
+            # Permitimos un margen de tolerancia
+            expected_ratio = 2.0
+            tolerance = 0.1
+            
+            if abs(aspect_ratio - expected_ratio) <= tolerance:
+                print(f"✅ Imagen 360° válida (ratio: {aspect_ratio:.2f})")
+                return True
+            else:
+                print(f"⚠️ Imagen no parece ser 360° (ratio: {aspect_ratio:.2f}, esperado: ~2.0)")
+                return False
+                
+    except ImportError:
+        print("⚠️ PIL no disponible, saltando validación 360°")
+        return True  # Si no podemos validar, asumimos que es válida
+    except Exception as e:
+        print(f"⚠️ Error validando imagen 360°: {e}")
+        return True  # Si hay error, asumimos que es válida
+
 def get_image_name_without_extension(image_path):
     """Obtiene el nombre de la imagen sin extensión"""
     return Path(image_path).stem

@@ -89,27 +89,25 @@ class AnalizadorArboles:
                     else:
                         texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
                 
-                # Parsear CSV: id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,nivel_severidad,requiere_intervencion,prioridad,confianza_modelo,estado_general,error
+                # Parsear CSV: id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,error
                 campos = [campo.strip() for campo in texto_limpio.split(',')]
                 
-                if len(campos) >= 11:
+                if len(campos) >= 9:
                     analisis = {
                         "id_imagen": campos[0],
                         "nombre_archivo": campos[1],
                         "ruta_imagen": campos[2],
                         "tipo_analisis": campos[3],
                         "descripcion_incidencia": campos[4],
-                        "nivel_severidad": campos[5],
-                        "requiere_intervencion": campos[6].lower() == 'true',
-                        "prioridad": campos[7],
-                        "confianza_modelo": campos[8],
-                        "estado_general": campos[9],
-                        "error": campos[10],
+                        "requiere_intervencion": campos[5].lower() == 'true',
+                        "confianza_modelo": campos[6],
+                        "estado_general": campos[7],
+                        "error": campos[8],
                         "hay_arbol": campos[4] != "sin incidencias" and campos[4] != "no detectada",
                         "analisis_csv_completo": texto_limpio
                     }
                 else:
-                    raise ValueError(f"CSV incompleto: se esperaban 11 campos, se obtuvieron {len(campos)}")
+                    raise ValueError(f"CSV incompleto: se esperaban 9 campos, se obtuvieron {len(campos)}")
                     
             except Exception as e:
                 # Si no se puede parsear el CSV, crear estructura básica
