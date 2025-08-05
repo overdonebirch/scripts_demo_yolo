@@ -50,8 +50,12 @@ class AnalizadorArboles:
             # Leer el prompt desde el archivo externo
             prompt_base = leer_prompt_desde_archivo('prompt_arbol.txt')
             
-            # Agregar información de la imagen al prompt
-            prompt = f"{prompt_base}\n\nPara esta imagen:\n- id_imagen: {id_imagen}\n- nombre_archivo: {nombre_archivo}\n- ruta_imagen: {ruta_imagen}\n- tipo_analisis: arbol\n\nIncluye esta información en los primeros campos de tu respuesta CSV."
+            # Formatear el prompt con la información del archivo
+            prompt = prompt_base.format(
+                id_imagen=id_imagen,
+                nombre_archivo=nombre_archivo,
+                ruta_imagen=ruta_imagen
+            )
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -89,25 +93,54 @@ class AnalizadorArboles:
                     else:
                         texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
                 
-                # Parsear CSV: id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,error
+                # Obtener información del archivo (manejada por el script)
+                nombre_archivo = os.path.basename(imagen_path)
+                id_imagen = nombre_archivo[:7]
+                ruta_imagen = imagen_path
+                
+                # Parsear CSV esperado: id_imagen,nombre_archivo,ruta_imagen,arbol,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,
                 campos = [campo.strip() for campo in texto_limpio.split(',')]
                 
-                if len(campos) >= 9:
-                    analisis = {
-                        "id_imagen": campos[0],
-                        "nombre_archivo": campos[1],
-                        "ruta_imagen": campos[2],
-                        "tipo_analisis": campos[3],
-                        "descripcion_incidencia": campos[4],
-                        "requiere_intervencion": campos[5].lower() == 'true',
-                        "confianza_modelo": campos[6],
-                        "estado_general": campos[7],
-                        "error": campos[8],
-                        "hay_arbol": campos[4] != "sin incidencias" and campos[4] != "no detectada",
-                        "analisis_csv_completo": texto_limpio
-                    }
+                # Validar que tenemos exactamente 8 o 9 campos (el último puede estar vacío)
+                if len(campos) >= 8:
+                    # Validar que los primeros 4 campos coincidan con lo esperado
+                    if (len(campos) >= 8 and 
+                        campos[0] == id_imagen and 
+                        campos[1] == nombre_archivo and 
+                        campos[3] == "arbol"):
+                        
+                        # Validar y limpiar confianza_modelo (debe ser numérico)
+                        confianza_raw = campos[6]
+                        try:
+                            # Extraer solo números del campo confianza
+                            import re
+                            numeros = re.findall(r'\d+', confianza_raw)
+                            if numeros:
+                                confianza_numero = int(numeros[0])
+                                # Asegurar que esté en rango 0-100
+                                confianza_numero = max(0, min(100, confianza_numero))
+                            else:
+                                confianza_numero = 90  # Valor por defecto
+                        except:
+                            confianza_numero = 90  # Valor por defecto si hay error
+                        
+                        analisis = {
+                            "id_imagen": campos[0],
+                            "nombre_archivo": campos[1],
+                            "ruta_imagen": campos[2],
+                            "tipo_analisis": campos[3],
+                            "descripcion_incidencia": campos[4],
+                            "requiere_intervencion": campos[5].lower() == 'true',
+                            "confianza_modelo": str(confianza_numero),  # Siempre numérico como string
+                            "estado_general": campos[7],
+                            "error": campos[8] if len(campos) > 8 else "",
+                            "hay_arbol": campos[4] != "sin incidencias" and campos[4] != "no detectada",
+                            "analisis_csv_completo": texto_limpio
+                        }
+                    else:
+                        raise ValueError(f"Formato CSV incorrecto. Esperado: {id_imagen},{nombre_archivo},{ruta_imagen},arbol,...")
                 else:
-                    raise ValueError(f"CSV incompleto: se esperaban 9 campos, se obtuvieron {len(campos)}")
+                    raise ValueError(f"CSV incompleto: se esperaban al menos 8 campos, se obtuvieron {len(campos)}")
                     
             except Exception as e:
                 # Si no se puede parsear el CSV, crear estructura básica
@@ -268,8 +301,12 @@ class AnalizadorAlcorques:
             # Leer el prompt desde el archivo externo
             prompt_base = leer_prompt_desde_archivo('prompt_alcorque.txt')
             
-            # Agregar información de la imagen al prompt
-            prompt = f"{prompt_base}\n\nPara esta imagen:\n- id_imagen: {id_imagen}\n- nombre_archivo: {nombre_archivo}\n- ruta_imagen: {ruta_imagen}\n- tipo_analisis: alcorque\n\nIncluye esta información en los primeros campos de tu respuesta CSV."
+            # Formatear el prompt con la información del archivo
+            prompt = prompt_base.format(
+                id_imagen=id_imagen,
+                nombre_archivo=nombre_archivo,
+                ruta_imagen=ruta_imagen
+            )
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -304,26 +341,53 @@ class AnalizadorAlcorques:
                     else:
                         texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
                 
-                # Parsear CSV: id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,nivel_severidad,requiere_intervencion,prioridad,confianza_modelo,estado_general,error
+                # Obtener información del archivo (manejada por el script)
+                nombre_archivo = os.path.basename(imagen_path)
+                id_imagen = nombre_archivo[:7]
+                ruta_imagen = imagen_path
+                
+                # Parsear CSV esperado: id_imagen,nombre_archivo,ruta_imagen,alcorque,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,
                 campos = [campo.strip() for campo in texto_limpio.split(',')]
                 
-                if len(campos) >= 11:
-                    analisis = {
-                        "id_imagen": campos[0],
-                        "nombre_archivo": campos[1],
-                        "ruta_imagen": campos[2],
-                        "tipo_analisis": campos[3],
-                        "descripcion_incidencia": campos[4],
-                        "nivel_severidad": campos[5],
-                        "requiere_intervencion": campos[6].lower() == 'true',
-                        "prioridad": campos[7],
-                        "confianza_modelo": campos[8],
-                        "estado_general": campos[9],
-                        "error": campos[10],
-                        "analisis_csv_completo": texto_limpio
-                    }
+                # Validar que tenemos exactamente 8 o 9 campos (el último puede estar vacío)
+                if len(campos) >= 8:
+                    # Validar que los primeros 4 campos coincidan con lo esperado
+                    if (len(campos) >= 8 and 
+                        campos[0] == id_imagen and 
+                        campos[1] == nombre_archivo and 
+                        campos[3] == "alcorque"):
+                        
+                        # Validar y limpiar confianza_modelo (debe ser numérico)
+                        confianza_raw = campos[6]
+                        try:
+                            # Extraer solo números del campo confianza
+                            import re
+                            numeros = re.findall(r'\d+', confianza_raw)
+                            if numeros:
+                                confianza_numero = int(numeros[0])
+                                # Asegurar que esté en rango 0-100
+                                confianza_numero = max(0, min(100, confianza_numero))
+                            else:
+                                confianza_numero = 90  # Valor por defecto
+                        except:
+                            confianza_numero = 90  # Valor por defecto si hay error
+                        
+                        analisis = {
+                            "id_imagen": campos[0],
+                            "nombre_archivo": campos[1],
+                            "ruta_imagen": campos[2],
+                            "tipo_analisis": campos[3],
+                            "descripcion_incidencia": campos[4],
+                            "requiere_intervencion": campos[5].lower() == 'true',
+                            "confianza_modelo": str(confianza_numero),  # Siempre numérico como string
+                            "estado_general": campos[7],
+                            "error": campos[8] if len(campos) > 8 else "",
+                            "analisis_csv_completo": texto_limpio
+                        }
+                    else:
+                        raise ValueError(f"Formato CSV incorrecto. Esperado: {id_imagen},{nombre_archivo},{ruta_imagen},alcorque,...")
                 else:
-                    raise ValueError(f"CSV incompleto: se esperaban 11 campos, se obtuvieron {len(campos)}")
+                    raise ValueError(f"CSV incompleto: se esperaban al menos 8 campos, se obtuvieron {len(campos)}")
                     
             except Exception as e:
                 # Si no se puede parsear el CSV, crear estructura básica
