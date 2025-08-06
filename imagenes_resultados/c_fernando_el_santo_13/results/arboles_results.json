@@ -1,0 +1,226 @@
+[
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_006_left_conf0.55.jpg",
+    "nombre": "arbol_006_left_conf0.55.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "saludable",
+      "descripcion_incidencia": "El árbol presenta una ligera interferencia con la visibilidad de la fachada y posible acumulación de residuos en la acera.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_002_back_conf0.71.jpg",
+    "nombre": "arbol_002_back_conf0.71.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": true,
+      "confianza_modelo": 70,
+      "estado_general": "generalmente saludable, pero requiere poda",
+      "descripcion_incidencia": "El árbol presenta ramas que interfieren con la visibilidad de las señales de tráfico y necesita una poda para garantizar la seguridad y la estética.",
+      "error": "",
+      "interferencia_visibilidad": {
+        "señales": {
+          "obstruccion": "parcial",
+          "severidad": "moderada"
+        },
+        "semaforos": {
+          "obstruccion": "no aplicable",
+          "severidad": "no aplicable"
+        }
+      },
+      "proximidad_fachadas": {
+        "fachadas": {
+          "contacto": "si",
+          "severidad": "moderada"
+        },
+        "farolas": {
+          "contacto": "no",
+          "severidad": "no aplicable"
+        },
+        "otros_elementos": {
+          "contacto": "no",
+          "severidad": "no aplicable"
+        }
+      },
+      "sintomas_mal_estado": [
+        "ninguno aparente en la imagen, aunque una inspección in situ podría revelar problemas ocultos"
+      ],
+      "ramas_sobre_calzada_acera": {
+        "calzada": {
+          "altura": "no aplicable",
+          "severidad": "no aplicable"
+        },
+        "acera": {
+          "altura": "no aplicable",
+          "severidad": "no aplicable"
+        }
+      },
+      "estructuras_copa": {
+        "nidos": {
+          "presentes": "no",
+          "diametro": "no aplicable",
+          "posicion": "no aplicable"
+        }
+      },
+      "acumulacion_residuos": "no",
+      "necesidad_desbroce": "si, poda selectiva",
+      "intervencion_tipo": "poda programada para eliminar ramas que interfieren con la visibilidad de las señales de tráfico y que están demasiado cerca de la fachada."
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_003_front_conf0.81.jpg",
+    "nombre": "arbol_003_front_conf0.81.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "saludable",
+      "descripcion_incidencia": "El árbol presenta un estado general saludable, sin incidencias relevantes que requieran intervención inmediata. Se recomienda una poda de mantenimiento programada.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_009_combined_2_faces_conf0.42.jpg",
+    "nombre": "arbol_009_combined_2_faces_conf0.42.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "saludable",
+      "descripcion_incidencia": "El árbol presenta un crecimiento adecuado y no muestra síntomas de enfermedad o daño significativo.  No interfiere con la visibilidad de señales de tráfico ni presenta ramas peligrosamente bajas.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_008_combined_2_faces_conf0.63.jpg",
+    "nombre": "arbol_008_combined_2_faces_conf0.63.jpg",
+    "analisis": {
+      "id_imagen": "1",
+      "nombre_archivo": "imagen_arbol.jpg",
+      "ruta_imagen": "/ruta/a/la/imagen",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "Saludable",
+      "descripcion_incidencia": "El árbol se encuentra en buen estado general, sin incidencias significativas que requieran intervención inmediata. Se recomienda una poda de mantenimiento programada.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_004_front_conf0.59.jpg",
+    "nombre": "arbol_004_front_conf0.59.jpg",
+    "analisis": {
+      "id_imagen": "imagen_1",
+      "nombre_archivo": "calle_arboles.jpg",
+      "ruta_imagen": "/ruta/a/la/imagen",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": true,
+      "confianza_modelo": 70,
+      "estado_general": "aparentemente saludable, pero requiere poda",
+      "descripcion_incidencia": "Poda necesaria para mejorar la visibilidad y seguridad.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_005_left_conf0.76.jpg",
+    "nombre": "arbol_005_left_conf0.76.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "Saludable",
+      "descripcion_incidencia": "El árbol se encuentra en buen estado general, sin incidencias que requieran intervención inmediata.  Se recomienda una inspección más detallada in situ para una evaluación completa.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_000_combined_2_faces_conf0.90.jpg",
+    "nombre": "arbol_000_combined_2_faces_conf0.90.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "saludable",
+      "descripcion_incidencia": "El árbol presenta un estado aparentemente saludable, con una frondosa copa y follaje verde. No se observan señales de enfermedad o daño significativo. Sin embargo, se recomienda una inspección más detallada in situ para confirmar este diagnóstico.",
+      "error": ""
+    }
+  },
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\trees\\arbol_001_back_conf0.86.jpg",
+    "nombre": "arbol_001_back_conf0.86.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "arbol",
+      "requiere_intervencion": false,
+      "confianza_modelo": 70,
+      "estado_general": "saludable, pero necesita poda",
+      "descripcion_incidencia": "El árbol presenta algunas ramas secas y necesita una poda de formación y limpieza para mejorar su estética y seguridad.",
+      "error": "",
+      "interferencia_visibilidad": {
+        "señales_semaforos": {
+          "obstruccion": "ninguna",
+          "severidad": "ninguna"
+        }
+      },
+      "proximidad_fachadas": {
+        "fachadas": {
+          "obstruccion": "leve",
+          "severidad": "leve"
+        },
+        "farolas": {
+          "obstruccion": "ninguna",
+          "severidad": "ninguna"
+        },
+        "otros_elementos": {
+          "obstruccion": "ninguna",
+          "severidad": "ninguna"
+        }
+      },
+      "sintomas_mal_estado": [
+        "ramas secas"
+      ],
+      "ramas_sobre_calzada_acera": {
+        "calzada": {
+          "altura": "No se observan ramas sobre la calzada por debajo de 4,5m",
+          "severidad": "ninguna"
+        },
+        "acera": {
+          "altura": "No se observan ramas sobre la acera por debajo de 2,2m",
+          "severidad": "ninguna"
+        }
+      },
+      "estructuras_copa": {
+        "nidos": {
+          "existencia": "no",
+          "diametro": "0 cm",
+          "posicion": "ninguna"
+        }
+      },
+      "acumulacion_residuos": "no",
+      "necesidad_desbroce": "si, poda de formación y limpieza"
+    }
+  }
+]

@@ -1,0 +1,312 @@
+[
+  {
+    "id": 0,
+    "filename": "arbol_000_combined_2_faces_conf0.90.jpg",
+    "filepath": "trees\\arbol_000_combined_2_faces_conf0.90.jpg",
+    "directory": "trees",
+    "source_face": "combined_2_faces",
+    "confidence": 0.901882529258728,
+    "class": 3,
+    "original_bbox": [
+      2329.740966796875,
+      8.991601943969727,
+      4086.625,
+      2126.39013671875
+    ],
+    "spherical_center": {
+      "yaw": -153.15031561534357,
+      "pitch": 16.795195726220513
+    },
+    "extracted_bounds": {
+      "center_yaw": -153.15031561534357,
+      "center_pitch": 16.795195726220513,
+      "yaw_min": -180.92420958117978,
+      "yaw_max": -125.37642164950734,
+      "pitch_min": -23.914065654031916,
+      "pitch_max": 57.50445710647294
+    },
+    "crop_size": {
+      "width": 2733,
+      "height": 4446
+    }
+  },
+  {
+    "id": 1,
+    "filename": "arbol_001_back_conf0.86.jpg",
+    "filepath": "trees\\arbol_001_back_conf0.86.jpg",
+    "directory": "trees",
+    "source_face": "back",
+    "confidence": 0.8621894121170044,
+    "class": 3,
+    "original_bbox": [
+      1320.535400390625,
+      1218.658935546875,
+      2119.431396484375,
+      2285.42236328125
+    ],
+    "spherical_center": {
+      "yaw": 170.90054145195202,
+      "pitch": 8.120872583781773
+    },
+    "extracted_bounds": {
+      "center_yaw": 170.90054145195202,
+      "center_pitch": 8.120872583781773,
+      "yaw_min": 159.49052783586697,
+      "yaw_max": 182.31055506803708,
+      "pitch_min": -15.318753513897365,
+      "pitch_max": 25.70059215704113
+    },
+    "crop_size": {
+      "width": 1026,
+      "height": 2239
+    }
+  },
+  {
+    "id": 2,
+    "filename": "arbol_002_back_conf0.71.jpg",
+    "filepath": "trees\\arbol_002_back_conf0.71.jpg",
+    "directory": "trees",
+    "source_face": "back",
+    "confidence": 0.7129058241844177,
+    "class": 3,
+    "original_bbox": [
+      8.673047065734863,
+      6.939355373382568,
+      1105.4468994140625,
+      1596.36669921875
+    ],
+    "spherical_center": {
+      "yaw": 143.94545448610867,
+      "pitch": 26.197231231642743
+    },
+    "extracted_bounds": {
+      "center_yaw": 143.94545448610867,
+      "center_pitch": 26.197231231642743,
+      "yaw_min": 128.28108183904394,
+      "yaw_max": 159.6098271331734,
+      "pitch_min": -8.726709429022069,
+      "pitch_max": 52.390186727141355
+    },
+    "crop_size": {
+      "width": 1710,
+      "height": 3338
+    }
+  },
+  {
+    "id": 3,
+    "filename": "arbol_003_front_conf0.81.jpg",
+    "filepath": "trees\\arbol_003_front_conf0.81.jpg",
+    "directory": "trees",
+    "source_face": "front",
+    "confidence": 0.8103187680244446,
+    "class": 3,
+    "original_bbox": [
+      2061.57958984375,
+      852.453125,
+      3601.49658203125,
+      2540.214111328125
+    ],
+    "spherical_center": {
+      "yaw": 20.936198734260373,
+      "pitch": 9.111252096129034
+    },
+    "extracted_bounds": {
+      "center_yaw": 20.936198734260373,
+      "center_pitch": 9.111252096129034,
+      "yaw_min": -1.057244635605045,
+      "yaw_max": 42.92964210412579,
+      "pitch_min": -27.973339888619805,
+      "pitch_max": 36.924696084690666
+    },
+    "crop_size": {
+      "width": 2402,
+      "height": 3544
+    }
+  },
+  {
+    "id": 4,
+    "filename": "arbol_004_front_conf0.59.jpg",
+    "filepath": "trees\\arbol_004_front_conf0.59.jpg",
+    "directory": "trees",
+    "source_face": "front",
+    "confidence": 0.5901232361793518,
+    "class": 3,
+    "original_bbox": [
+      955.6298828125,
+      1287.7928466796875,
+      2167.01513671875,
+      2247.93603515625
+    ],
+    "spherical_center": {
+      "yaw": -13.367566902327331,
+      "pitch": 7.580325977368375
+    },
+    "extracted_bounds": {
+      "center_yaw": -13.367566902327331,
+      "center_pitch": 7.580325977368375,
+      "yaw_min": -30.668845553087984,
+      "yaw_max": 3.9337117484333195,
+      "pitch_min": -19.845639123158435,
+      "pitch_max": 28.149799802763486
+    },
+    "crop_size": {
+      "width": 1889,
+      "height": 2621
+    }
+  },
+  {
+    "id": 5,
+    "filename": "arbol_005_left_conf0.76.jpg",
+    "filepath": "trees\\arbol_005_left_conf0.76.jpg",
+    "directory": "trees",
+    "source_face": "left",
+    "confidence": 0.7551729083061218,
+    "class": 3,
+    "original_bbox": [
+      23.079296112060547,
+      8.752148628234863,
+      4015.85693359375,
+      3025.951904296875
+    ],
+    "spherical_center": {
+      "yaw": -90.79816936035704,
+      "pitch": 14.524847636086811
+    },
+    "extracted_bounds": {
+      "center_yaw": -90.79816936035704,
+      "center_pitch": 14.524847636086811,
+      "yaw_min": -147.82392419255402,
+      "yaw_max": -33.772414528160056,
+      "pitch_min": -71.65981335347152,
+      "pitch_max": 79.16334337825555
+    },
+    "crop_size": {
+      "width": 6228,
+      "height": 8043
+    }
+  },
+  {
+    "id": 6,
+    "filename": "arbol_006_left_conf0.55.jpg",
+    "filepath": "trees\\arbol_006_left_conf0.55.jpg",
+    "directory": "trees",
+    "source_face": "left",
+    "confidence": 0.5512459874153137,
+    "class": 3,
+    "original_bbox": [
+      2989.262939453125,
+      11.918554306030273,
+      4092.634765625,
+      2989.926025390625
+    ],
+    "spherical_center": {
+      "yaw": -53.90873926401446,
+      "pitch": 12.180999501047554
+    },
+    "extracted_bounds": {
+      "center_yaw": -53.90873926401446,
+      "center_pitch": 12.180999501047554,
+      "yaw_min": -74.39492758930037,
+      "yaw_max": -33.42255093872855,
+      "pitch_min": -53.25373497102606,
+      "pitch_max": 61.25705035510276
+    },
+    "crop_size": {
+      "width": 2236,
+      "height": 6253
+    }
+  },
+  {
+    "id": 7,
+    "filename": "alcorque_007_left_conf0.38.jpg",
+    "filepath": "planters\\alcorque_007_left_conf0.38.jpg",
+    "directory": "planters",
+    "source_face": "left",
+    "confidence": 0.3802972733974457,
+    "class": 0,
+    "original_bbox": [
+      3499.285888671875,
+      2848.823974609375,
+      4079.8671875,
+      3061.07666015625
+    ],
+    "spherical_center": {
+      "yaw": -49.62285343083833,
+      "pitch": -18.64230047718949
+    },
+    "extracted_bounds": {
+      "center_yaw": -49.62285343083833,
+      "center_pitch": -18.64230047718949,
+      "yaw_min": -57.277001413435684,
+      "yaw_max": -41.96870544824098,
+      "pitch_min": -21.207365890902945,
+      "pitch_max": -16.077235063476035
+    },
+    "crop_size": {
+      "width": 834,
+      "height": 280
+    }
+  },
+  {
+    "id": 8,
+    "filename": "arbol_008_combined_2_faces_conf0.63.jpg",
+    "filepath": "trees\\arbol_008_combined_2_faces_conf0.63.jpg",
+    "directory": "trees",
+    "source_face": "combined_2_faces",
+    "confidence": 0.6314061284065247,
+    "class": 3,
+    "original_bbox": [
+      2167.94189453125,
+      11.999608993530273,
+      4092.030029296875,
+      3345.92529296875
+    ],
+    "spherical_center": {
+      "yaw": 117.8480965732403,
+      "pitch": 1.4573890634508402
+    },
+    "extracted_bounds": {
+      "center_yaw": 117.8480965732403,
+      "center_pitch": 1.4573890634508402,
+      "yaw_min": 90.36783390629961,
+      "yaw_max": 145.328359240181,
+      "pitch_min": -64.20260116180874,
+      "pitch_max": 67.11737928871042
+    },
+    "crop_size": {
+      "width": 3002,
+      "height": 7170
+    }
+  },
+  {
+    "id": 9,
+    "filename": "arbol_009_combined_2_faces_conf0.42.jpg",
+    "filepath": "trees\\arbol_009_combined_2_faces_conf0.42.jpg",
+    "directory": "trees",
+    "source_face": "combined_2_faces",
+    "confidence": 0.420621782541275,
+    "class": 3,
+    "original_bbox": [
+      1.16064453125,
+      780.708984375,
+      915.4303588867188,
+      2187.634033203125
+    ],
+    "spherical_center": {
+      "yaw": 52.694605895428005,
+      "pitch": -5.015673639464708
+    },
+    "extracted_bounds": {
+      "center_yaw": 52.694605895428005,
+      "center_pitch": -5.015673639464708,
+      "yaw_min": 34.78189114140045,
+      "yaw_max": 70.60732064945556,
+      "pitch_min": -50.73448134793672,
+      "pitch_max": 40.703134069007305
+    },
+    "crop_size": {
+      "width": 1957,
+      "height": 4993
+    }
+  }
+]

@@ -4,21 +4,21 @@ Como experto en gestión de alcorques, analiza esta imagen y evalúa:
 2. ¿El alcorque está completamente vacío (sin árbol ni tocón)? Confirma asimismo la ausencia de plantones o tutores recientes.
 3. ¿Hay basura, escombros u otros objetos no autorizados dentro del alcorque? Describe su naturaleza y volumen aproximado.
 4. ¿Se aprecia un tocón en el alcorque? Indica su altura aproximada y posición relativa al borde.
-5. ¿La cobertura de malas hierbas supera el 50 % de la superficie o su altura excede los 15 cm? Indica densidad y especies dominantes.
+5. ¿La cobertura de malas hierbas supera el 50% de la superficie o su altura excede los 15 cm? Indica densidad y especies dominantes.
 6. ¿Hay presencia de charcos o encharcamientos en el alcorque o acera adyacente? Estima su extensión y si el agua parece estancada o reciente.
 7. ¿El estado general de la vegetación sugiere necesidad de desbroce?
 8. ¿Requiere intervención inmediata o programada?
 
-Responde SOLO en formato CSV (tabla) con UNA SOLA FILA de datos (sin encabezados). Los campos deben estar separados por comas y en este orden exacto:
-id_imagen,nombre_archivo,ruta_imagen,tipo_analisis,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,error
+Responde SOLO en formato JSON válido con la siguiente estructura. IMPORTANTE: Los valores numéricos mostrados son ejemplos. Proporciona datos reales basados en tu análisis. Para la confianza del modelo, sé honesto y realista - no asignes valores altos si tienes dudas sobre la precisión de tu evaluación debido a limitaciones de la imagen, condiciones de iluminación, ángulo de vista u otros factores.
 
-Donde:
-- id_imagen: Se proporcionará automáticamente
-- nombre_archivo: Se proporcionará automáticamente
-- ruta_imagen: Se proporcionará automáticamente
-- tipo_analisis: "alcorque"
-- requiere_intervencion: true o false
-- confianza_modelo: Porcentaje de confianza (ej: 85) o vacío
-- estado_general: "saludable", "vacío", "deteriorado"
-- descripcion_incidencia: Resumen conciso de todos los problemas detectados o "sin incidencias". Elabora esta descripción dependiendo del estado_general. Por ejemplo, si el estado_general es "saludable", la descripción debe ser "sin incidencias".
-- error: Vacío (se manejará automáticamente)
+{
+    "id_imagen": "se proporcionará automáticamente",
+    "nombre_archivo": "se proporcionará automáticamente", 
+    "ruta_imagen": "se proporcionará automáticamente",
+    "tipo_analisis": "alcorque",
+    "requiere_intervencion": true,
+    "confianza_modelo": 75,
+    "estado_general": "deteriorado",
+    "descripcion_incidencia": "Resumen conciso de todos los problemas detectados o 'sin incidencias'",
+    "error": ""
+}

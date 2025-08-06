@@ -1,0 +1,17 @@
+[
+  {
+    "imagen": "imagenes_resultados\\c_fernando_el_santo_13\\c_fernando_el_santo_13_full_trees\\planters\\alcorque_007_left_conf0.38.jpg",
+    "nombre": "alcorque_007_left_conf0.38.jpg",
+    "analisis": {
+      "id_imagen": "se proporcionará automáticamente",
+      "nombre_archivo": "se proporcionará automáticamente",
+      "ruta_imagen": "se proporcionará automáticamente",
+      "tipo_analisis": "alcorque",
+      "requiere_intervencion": true,
+      "confianza_modelo": 60,
+      "estado_general": "deteriorado",
+      "descripcion_incidencia": "Se observan grietas y levantamientos en el pavimento alrededor del alcorque, posiblemente causados por raíces del árbol.  El alcorque no está vacío; contiene un árbol.  Hay una cantidad moderada de hojas y pequeños desechos vegetales dentro del alcorque.  No se observan charcos ni encharcamientos.  La cobertura de malas hierbas es inferior al 50% y su altura no supera los 15cm. Se recomienda desbroce y una inspección más detallada para evaluar el estado de las raíces y la posible necesidad de reparación del pavimento.",
+      "error": ""
+    }
+  }
+]

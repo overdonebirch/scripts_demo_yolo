@@ -2,6 +2,7 @@
 import google.generativeai as genai
 from PIL import Image
 import json
+import csv
 import os
 import sys
 import argparse
@@ -31,6 +32,64 @@ def leer_prompt_desde_archivo(nombre_archivo):
         print(f"❌ Error al leer el archivo de prompt '{nombre_archivo}': {e}")
         sys.exit(1)
 
+def convertir_json_a_csv(resultados, output_file, tipo_analisis):
+    """Convierte los resultados JSON a formato CSV"""
+    try:
+        csv_path = output_file.replace('.json', '.csv')
+        
+        # Campos CSV según la estructura definida
+        campos_csv = [
+            'id_imagen', 'nombre_archivo', 'ruta_imagen', 'tipo_analisis', 
+            'descripcion_incidencia', 'requiere_intervencion', 'confianza_modelo', 
+            'estado_general', 'error'
+        ]
+        
+        with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=campos_csv)
+            
+            # Escribir cabecera
+            writer.writeheader()
+            
+            # Escribir datos
+            for resultado in resultados:
+                analisis = resultado.get('analisis', {})
+                
+                # Si hay error, usar datos básicos
+                if 'error' in resultado:
+                    row = {
+                        'id_imagen': resultado['nombre'][:7] if len(resultado['nombre']) >= 7 else resultado['nombre'],
+                        'nombre_archivo': resultado['nombre'],
+                        'ruta_imagen': resultado['imagen'],
+                        'tipo_analisis': tipo_analisis,
+                        'descripcion_incidencia': 'Error de procesamiento',
+                        'requiere_intervencion': False,
+                        'confianza_modelo': '0',
+                        'estado_general': 'error',
+                        'error': resultado['error']
+                    }
+                else:
+                    # Extraer datos del análisis JSON
+                    row = {
+                        'id_imagen': resultado['nombre'][:7] if len(resultado['nombre']) >= 7 else resultado['nombre'],
+                        'nombre_archivo': resultado['nombre'],
+                        'ruta_imagen': resultado['imagen'],
+                        'tipo_analisis': tipo_analisis,
+                        'descripcion_incidencia': analisis.get('descripcion', analisis.get('descripcion_incidencia', 'sin descripción')),
+                        'requiere_intervencion': analisis.get('requiere_intervencion', False),
+                        'confianza_modelo': str(analisis.get('confianza_modelo', analisis.get('riesgo_nivel', '50'))),
+                        'estado_general': analisis.get('estado_general', 'indeterminado'),
+                        'error': analisis.get('error', '')
+                    }
+                
+                writer.writerow(row)
+        
+        print(f"📊 Archivo CSV generado: {csv_path}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error generando CSV: {e}")
+        return False
+
 class AnalizadorArboles:
     def __init__(self, api_key):
         """Inicializar el analizador con la API key de Gemini"""
@@ -42,20 +101,8 @@ class AnalizadorArboles:
         try:
             imagen = Image.open(imagen_path)
             
-            # Obtener información del archivo
-            nombre_archivo = os.path.basename(imagen_path)
-            id_imagen = nombre_archivo[:7]
-            ruta_imagen = imagen_path
-            
             # Leer el prompt desde el archivo externo
-            prompt_base = leer_prompt_desde_archivo('prompt_arbol.txt')
-            
-            # Formatear el prompt con la información del archivo
-            prompt = prompt_base.format(
-                id_imagen=id_imagen,
-                nombre_archivo=nombre_archivo,
-                ruta_imagen=ruta_imagen
-            )
+            prompt = leer_prompt_desde_archivo('prompt_arbol.txt')
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -74,103 +121,47 @@ class AnalizadorArboles:
         print(f"🌳 Analizando: {Path(imagen_path).name}")
         
         try:
-            analisis_csv = self.analizar_arbol(imagen_path)
+            analisis_texto = self.analizar_arbol(imagen_path)
             
-            # Procesar respuesta CSV
+            # Intentar parsear JSON
             try:
                 # Limpiar markdown si está presente
-                texto_limpio = analisis_csv.strip()
-                if texto_limpio.startswith('```csv') or texto_limpio.startswith('```'):
-                    lines = texto_limpio.split('\n')
-                    # Encontrar la línea que contiene los datos CSV
-                    csv_line = None
-                    for line in lines:
-                        if ',' in line and not line.startswith('#') and not line.startswith('|'):
-                            csv_line = line.strip()
-                            break
-                    if csv_line:
-                        texto_limpio = csv_line
-                    else:
-                        texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
+                texto_limpio = analisis_texto.strip()
+                if texto_limpio.startswith('```json'):
+                    texto_limpio = texto_limpio[7:]  # Remover ```json
+                if texto_limpio.endswith('```'):
+                    texto_limpio = texto_limpio[:-3]  # Remover ```
+                texto_limpio = texto_limpio.strip()
                 
-                # Obtener información del archivo (manejada por el script)
-                nombre_archivo = os.path.basename(imagen_path)
-                id_imagen = nombre_archivo[:7]
-                ruta_imagen = imagen_path
-                
-                # Parsear CSV esperado: id_imagen,nombre_archivo,ruta_imagen,arbol,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,
-                campos = [campo.strip() for campo in texto_limpio.split(',')]
-                
-                # Validar que tenemos exactamente 8 o 9 campos (el último puede estar vacío)
-                if len(campos) >= 8:
-                    # Validar que los primeros 4 campos coincidan con lo esperado
-                    if (len(campos) >= 8 and 
-                        campos[0] == id_imagen and 
-                        campos[1] == nombre_archivo and 
-                        campos[3] == "arbol"):
-                        
-                        # Validar y limpiar confianza_modelo (debe ser numérico)
-                        confianza_raw = campos[6]
-                        try:
-                            # Extraer solo números del campo confianza
-                            import re
-                            numeros = re.findall(r'\d+', confianza_raw)
-                            if numeros:
-                                confianza_numero = int(numeros[0])
-                                # Asegurar que esté en rango 0-100
-                                confianza_numero = max(0, min(100, confianza_numero))
-                            else:
-                                confianza_numero = 90  # Valor por defecto
-                        except:
-                            confianza_numero = 90  # Valor por defecto si hay error
-                        
-                        analisis = {
-                            "id_imagen": campos[0],
-                            "nombre_archivo": campos[1],
-                            "ruta_imagen": campos[2],
-                            "tipo_analisis": campos[3],
-                            "descripcion_incidencia": campos[4],
-                            "requiere_intervencion": campos[5].lower() == 'true',
-                            "confianza_modelo": str(confianza_numero),  # Siempre numérico como string
-                            "estado_general": campos[7],
-                            "error": campos[8] if len(campos) > 8 else "",
-                            "hay_arbol": campos[4] != "sin incidencias" and campos[4] != "no detectada",
-                            "analisis_csv_completo": texto_limpio
-                        }
-                    else:
-                        raise ValueError(f"Formato CSV incorrecto. Esperado: {id_imagen},{nombre_archivo},{ruta_imagen},arbol,...")
-                else:
-                    raise ValueError(f"CSV incompleto: se esperaban al menos 8 campos, se obtuvieron {len(campos)}")
-                    
-            except Exception as e:
-                # Si no se puede parsear el CSV, crear estructura básica
+                analisis = json.loads(texto_limpio)
+            except json.JSONDecodeError:
+                # Si no es JSON válido, crear estructura básica
                 analisis = {
-                    "hay_arbol": "árbol" in analisis_csv.lower() or "tree" in analisis_csv.lower(),
+                    "hay_arbol": "árbol" in analisis_texto.lower(),
                     "estado_general": "indeterminado",
-                    "descripcion_incidencia": "Análisis no estructurado",
-                    "requiere_intervencion": False,
-                    "error": f"Error parseando CSV: {str(e)}",
-                    "analisis_texto_original": analisis_csv
+                    "riesgo_nivel": 5,
+                    "descripcion": "Análisis no estructurado",
+                    "analisis_texto": analisis_texto
                 }
             
             # Mostrar resumen en consola
             if analisis.get('hay_arbol', False):
                 estado = analisis.get('estado_general', 'indeterminado')
-                descripcion = analisis.get('descripcion_incidencia', '')
-                severidad = analisis.get('nivel_severidad', '')
-                requiere_intervencion = analisis.get('requiere_intervencion', False)
-                prioridad = analisis.get('prioridad', '')
-                
+                riesgo = analisis.get('riesgo_nivel', 0)
+                descripcion = analisis.get('descripcion', '')
                 print(f"   ✅ Árbol detectado")
                 print(f"   📊 Estado: {estado}")
-                if severidad:
-                    print(f"   ⚠️  Severidad: {severidad}")
-                if descripcion and descripcion != 'sin incidencias':
+                print(f"   ⚠️  Riesgo: {riesgo}/10")
+                if descripcion:
                     print(f"   📝 {descripcion}")
-                if requiere_intervencion:
-                    print(f"   🚨 Requiere intervención")
-                    if prioridad:
-                        print(f"   🔴 Prioridad: {prioridad}")
+                
+                problemas = analisis.get('problemas', [])
+                if problemas:
+                    print(f"   🚨 Problemas: {', '.join(problemas)}")
+                    
+                obstrucciones = analisis.get('obstrucciones', [])
+                if obstrucciones:
+                    print(f"   🚧 Obstrucciones: {', '.join(obstrucciones)}")
             else:
                 print(f"   ⚪ No se detectó árbol en esta imagen")
             
@@ -227,15 +218,20 @@ class AnalizadorArboles:
         return resultados
     
     def guardar_resultados(self, resultados, output_file):
-        """Guarda los resultados en un archivo JSON"""
+        """Guarda los resultados en formato JSON y CSV"""
         try:
             # Crear directorio de salida si no existe
             output_path = Path(output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Guardar JSON
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(resultados, f, indent=2, ensure_ascii=False)
-            print(f"\n💾 Resultados guardados en: {output_file}")
+            print(f"💾 Resultados JSON guardados en: {output_file}")
+            
+            # Generar CSV
+            convertir_json_a_csv(resultados, output_file, 'arbol')
+            
             return True
         except Exception as e:
             print(f"❌ Error guardando resultados: {e}")
@@ -293,20 +289,8 @@ class AnalizadorAlcorques:
         try:
             imagen = Image.open(imagen_path)
             
-            # Obtener información del archivo
-            nombre_archivo = os.path.basename(imagen_path)
-            id_imagen = nombre_archivo[:7]
-            ruta_imagen = imagen_path
-            
             # Leer el prompt desde el archivo externo
-            prompt_base = leer_prompt_desde_archivo('prompt_alcorque.txt')
-            
-            # Formatear el prompt con la información del archivo
-            prompt = prompt_base.format(
-                id_imagen=id_imagen,
-                nombre_archivo=nombre_archivo,
-                ruta_imagen=ruta_imagen
-            )
+            prompt = leer_prompt_desde_archivo('prompt_alcorque.txt')
             
             response = self.model.generate_content([prompt, imagen])
             return response.text
@@ -322,100 +306,21 @@ class AnalizadorAlcorques:
         print(f"🛠️ Analizando alcorque: {Path(imagen_path).name}")
         
         try:
-            analisis_csv = self.analizar_alcorque(imagen_path)
-            
-            # Procesar respuesta CSV
+            analisis_texto = self.analizar_alcorque(imagen_path)
             try:
                 # Limpiar markdown si está presente
-                texto_limpio = analisis_csv.strip()
-                if texto_limpio.startswith('```csv') or texto_limpio.startswith('```'):
-                    lines = texto_limpio.split('\n')
-                    # Encontrar la línea que contiene los datos CSV
-                    csv_line = None
-                    for line in lines:
-                        if ',' in line and not line.startswith('#') and not line.startswith('|'):
-                            csv_line = line.strip()
-                            break
-                    if csv_line:
-                        texto_limpio = csv_line
-                    else:
-                        texto_limpio = texto_limpio.replace('```csv', '').replace('```', '').strip()
+                texto_limpio = analisis_texto.strip()
+                if texto_limpio.startswith('```json'):
+                    texto_limpio = texto_limpio[7:]  # Remover ```json
+                if texto_limpio.endswith('```'):
+                    texto_limpio = texto_limpio[:-3]  # Remover ```
+                texto_limpio = texto_limpio.strip()
                 
-                # Obtener información del archivo (manejada por el script)
-                nombre_archivo = os.path.basename(imagen_path)
-                id_imagen = nombre_archivo[:7]
-                ruta_imagen = imagen_path
-                
-                # Parsear CSV esperado: id_imagen,nombre_archivo,ruta_imagen,alcorque,descripcion_incidencia,requiere_intervencion,confianza_modelo,estado_general,
-                campos = [campo.strip() for campo in texto_limpio.split(',')]
-                
-                # Validar que tenemos exactamente 8 o 9 campos (el último puede estar vacío)
-                if len(campos) >= 8:
-                    # Validar que los primeros 4 campos coincidan con lo esperado
-                    if (len(campos) >= 8 and 
-                        campos[0] == id_imagen and 
-                        campos[1] == nombre_archivo and 
-                        campos[3] == "alcorque"):
-                        
-                        # Validar y limpiar confianza_modelo (debe ser numérico)
-                        confianza_raw = campos[6]
-                        try:
-                            # Extraer solo números del campo confianza
-                            import re
-                            numeros = re.findall(r'\d+', confianza_raw)
-                            if numeros:
-                                confianza_numero = int(numeros[0])
-                                # Asegurar que esté en rango 0-100
-                                confianza_numero = max(0, min(100, confianza_numero))
-                            else:
-                                confianza_numero = 90  # Valor por defecto
-                        except:
-                            confianza_numero = 90  # Valor por defecto si hay error
-                        
-                        analisis = {
-                            "id_imagen": campos[0],
-                            "nombre_archivo": campos[1],
-                            "ruta_imagen": campos[2],
-                            "tipo_analisis": campos[3],
-                            "descripcion_incidencia": campos[4],
-                            "requiere_intervencion": campos[5].lower() == 'true',
-                            "confianza_modelo": str(confianza_numero),  # Siempre numérico como string
-                            "estado_general": campos[7],
-                            "error": campos[8] if len(campos) > 8 else "",
-                            "analisis_csv_completo": texto_limpio
-                        }
-                    else:
-                        raise ValueError(f"Formato CSV incorrecto. Esperado: {id_imagen},{nombre_archivo},{ruta_imagen},alcorque,...")
-                else:
-                    raise ValueError(f"CSV incompleto: se esperaban al menos 8 campos, se obtuvieron {len(campos)}")
-                    
-            except Exception as e:
-                # Si no se puede parsear el CSV, crear estructura básica
+                analisis = json.loads(texto_limpio)
+            except json.JSONDecodeError:
                 analisis = {
-                    "descripcion_incidencia": "Análisis no estructurado",
-                    "requiere_intervencion": False,
-                    "estado_general": "indeterminado",
-                    "error": f"Error parseando CSV: {str(e)}",
-                    "analisis_texto_original": analisis_csv
+                    "analisis_texto": analisis_texto
                 }
-            
-            # Mostrar resumen en consola
-            descripcion = analisis.get('descripcion_incidencia', '')
-            estado = analisis.get('estado_general', 'indeterminado')
-            severidad = analisis.get('nivel_severidad', '')
-            requiere_intervencion = analisis.get('requiere_intervencion', False)
-            prioridad = analisis.get('prioridad', '')
-            
-            print(f"   📊 Estado: {estado}")
-            if severidad:
-                print(f"   ⚠️  Severidad: {severidad}")
-            if descripcion and descripcion != 'sin incidencias':
-                print(f"   📝 {descripcion}")
-            if requiere_intervencion:
-                print(f"   🚨 Requiere intervención")
-                if prioridad:
-                    print(f"   🔴 Prioridad: {prioridad}")
-            
             return analisis
         except Exception as e:
             print(f"   ❌ Error analizando alcorque: {e}")
@@ -446,15 +351,20 @@ class AnalizadorAlcorques:
         return resultados
 
     def guardar_resultados_alcorque(self, resultados, output_file):
-        """Guarda los resultados de alcorques en un archivo JSON"""
+        """Guarda los resultados de alcorques en formato JSON y CSV"""
         try:
             # Crear directorio de salida si no existe
             output_path = Path(output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Guardar JSON
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(resultados, f, indent=2, ensure_ascii=False)
-            print(f"\n💾 Resultados de alcorques guardados en: {output_file}")
+            print(f"💾 Resultados JSON de alcorques guardados en: {output_file}")
+            
+            # Generar CSV
+            convertir_json_a_csv(resultados, output_file, 'alcorque')
+            
             return True
         except Exception as e:
             print(f"❌ Error guardando resultados de alcorques: {e}")
@@ -592,14 +502,19 @@ class AnalizadorLimpieza:
         return resultados
 
     def guardar_resultados_limpieza(self, resultados, output_file):
-        """Guarda los resultados de limpieza en un archivo JSON"""
+        """Guarda los resultados de limpieza en formato JSON y CSV"""
         try:
             output_path = Path(output_file)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Guardar JSON
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(resultados, f, indent=2, ensure_ascii=False)
-            print(f"\n💾 Resultados de limpieza guardados en: {output_file}")
+            print(f"💾 Resultados JSON de limpieza guardados en: {output_file}")
+            
+            # Generar CSV
+            convertir_json_a_csv(resultados, output_file, 'limpieza')
+            
             return True
         except Exception as e:
             print(f"❌ Error guardando resultados de limpieza: {e}")
@@ -753,7 +668,7 @@ def main():
         print(f"❌ Error: {args.entrada} no es un archivo ni directorio válido")
         sys.exit(1)
     
-    # Guardar resultados
+    # Guardar resultados (JSON + CSV)
     if args.tipo == 'alcorques':
         analizador.guardar_resultados_alcorque(resultados, args.output)
     elif args.tipo == 'limpieza':
@@ -771,6 +686,7 @@ def main():
             analizador.generar_resumen(resultados)
     
     print(f"\n🎯 Análisis completado")
+    print(f"📄 Se generaron archivos JSON y CSV")
 
 if __name__ == "__main__":
     main()
